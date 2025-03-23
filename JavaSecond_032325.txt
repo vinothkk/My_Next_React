@@ -1,0 +1,48 @@
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+public class MonthDataGenerator {
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("MMM-yy", Locale.ENGLISH);
+
+    public static Map<String, Integer> generateFullYearData(Map<String, Integer> inputData) {
+        if (inputData.isEmpty()) return new HashMap<>();
+
+        // Step 1: Convert and sort the input months
+        List<YearMonth> inputMonths = new ArrayList<>();
+        for (String key : inputData.keySet()) {
+            inputMonths.add(YearMonth.parse(key, FORMATTER));
+        }
+        Collections.sort(inputMonths);
+
+        YearMonth earliestMonth = inputMonths.get(0);
+        YearMonth latestMonth = inputMonths.get(inputMonths.size() - 1);
+
+        // Step 2: Ensure 12 months covering both earliest and latest months
+        YearMonth startMonth = earliestMonth.minusMonths(6); 
+        YearMonth endMonth = startMonth.plusMonths(11);
+
+        // Adjust the start month to ensure the latest month is included
+        while (endMonth.isBefore(latestMonth)) {
+            startMonth = startMonth.plusMonths(1);
+            endMonth = startMonth.plusMonths(11);
+        }
+
+        // Step 3: Generate the 12-month map
+        Map<String, Integer> completeData = new LinkedHashMap<>();
+        for (YearMonth month = startMonth; !month.isAfter(endMonth); month = month.plusMonths(1)) {
+            String monthKey = month.format(FORMATTER);
+            completeData.put(monthKey, inputData.getOrDefault(monthKey, 0)); // Default missing values to 0
+        }
+
+        return completeData;
+    }
+
+    public static void main(String[] args) {
+        // Test case with "Jan-26" and "Nov-26"
+        Map<String, Integer> option6 = Map.of("Jan-26", 5, "Nov-26", 5);
+
+        // Generate and print the full year data
+        System.out.println(generateFullYearData(option6));
+    }
+}

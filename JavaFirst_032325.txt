@@ -1,0 +1,52 @@
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+public class MonthDataGenerator {
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("MMM-yy", Locale.ENGLISH);
+    
+    public static Map<String, Integer> generateFullYearData(Map<String, Integer> inputData) {
+        if (inputData.isEmpty()) return new HashMap<>();
+
+        // Get the first key from the map (any key will work since we sort later)
+        String firstMonth = inputData.keySet().iterator().next();
+        YearMonth baseMonth = YearMonth.parse(firstMonth, FORMATTER);
+
+        // Determine rolling 12 months around the given data
+        List<YearMonth> fullYearMonths = getRollingYearMonths(baseMonth);
+        
+        // Build the complete map ensuring 12 months exist
+        Map<String, Integer> completeData = new LinkedHashMap<>();
+        for (YearMonth month : fullYearMonths) {
+            String monthKey = month.format(FORMATTER);
+            completeData.put(monthKey, inputData.getOrDefault(monthKey, 0)); // Default missing values to 0
+        }
+
+        return completeData;
+    }
+
+    private static List<YearMonth> getRollingYearMonths(YearMonth baseMonth) {
+        List<YearMonth> months = new ArrayList<>();
+        for (int i = -6; i < 6; i++) { // Create a window of 12 months
+            months.add(baseMonth.plusMonths(i));
+        }
+        return months;
+    }
+
+    public static void main(String[] args) {
+        // Example input scenarios
+        Map<String, Integer> option1 = Map.of("Nov-25", 90);
+        Map<String, Integer> option2 = Map.of("Mar-25", 90);
+        Map<String, Integer> option3 = Map.of("Mar-26", 5, "Jun-26", 5);
+        Map<String, Integer> option6 = Map.of("Jan-26", 5, "Nov-26", 5);
+        
+        // Map<String, Integer> option4 = Map.of("Mar-25", 5, "Jan-26", 5);
+        Map<String, Integer> option5 = Map.of("Mar-25", 90, "Apr-25", 90, "May-25", 90, "Jun-25", 90, "Jul-25", 90, "Agu-25", 90);
+
+        // Generate missing months dynamically
+        // System.out.println(generateFullYearData(option1));
+        // System.out.println(generateFullYearData(option2));
+        // System.out.println(generateFullYearData(option3));
+                System.out.println(generateFullYearData(option6));
+    }
+}

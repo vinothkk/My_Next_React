@@ -1,0 +1,95 @@
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+public class MonthDataGenerator {
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("MMM-yy", Locale.ENGLISH);
+
+    public static Map<String, Integer> generateFullYearData(Map<String, Integer> inputData) {
+        List<YearMonth> inputMonths = new ArrayList<>();
+
+        // 🟢 If input is null or empty, generate the last 12 months with 0 values
+        if (inputData == null || inputData.isEmpty()) {
+            return generateEmptyLast12Months();
+        }
+
+        // 🟢 Convert input keys to YearMonth objects and sort them
+        for (String key : inputData.keySet()) {
+            inputMonths.add(YearMonth.parse(key, FORMATTER));
+        }
+        Collections.sort(inputMonths);
+
+        // 🟢 Handle Use Case 2: Ignore months beyond the current month
+        YearMonth currentMonth = YearMonth.now();
+        inputMonths.removeIf(month -> month.isAfter(currentMonth));
+
+        // 🟢 Handle Use Case 1: If more than 12 months, keep the most recent 12 months
+        if (inputMonths.size() > 12) {
+            inputMonths = inputMonths.subList(inputMonths.size() - 12, inputMonths.size());
+        }
+
+        // Get start and end months for exactly 12 months
+        YearMonth startMonth = inputMonths.get(0);
+        YearMonth endMonth = startMonth.plusMonths(11);
+
+        // 🟢 Adjust the window if the latest month isn't covered
+        while (endMonth.isBefore(inputMonths.get(inputMonths.size() - 1))) {
+            startMonth = startMonth.plusMonths(1);
+            endMonth = startMonth.plusMonths(11);
+        }
+
+        // 🟢 Generate the final 12-month map
+        Map<String, Integer> completeData = new LinkedHashMap<>();
+        for (YearMonth month = startMonth; !month.isAfter(endMonth); month = month.plusMonths(1)) {
+            String monthKey = month.format(FORMATTER);
+            completeData.put(monthKey, inputData.getOrDefault(monthKey, 0)); // Default missing values to 0
+        }
+
+        return completeData;
+    }
+
+    // 🟢 Use Case 3: Handle empty input by generating last 12 months up to current month
+    private static Map<String, Integer> generateEmptyLast12Months() {
+        Map<String, Integer> completeData = new LinkedHashMap<>();
+        YearMonth currentMonth = YearMonth.now();
+
+        for (int i = 11; i >= 0; i--) {
+            YearMonth month = currentMonth.minusMonths(i);
+            completeData.put(month.format(FORMATTER), 0);
+        }
+
+        return completeData;
+    }
+
+    public static void main(String[] args) {
+        // 🟢 Test Use Case 1: More than 12 months of data, get the most recent 12 months
+       Map<String, Integer> useCase1 = Map.ofEntries(
+            new AbstractMap.SimpleEntry<>("Jan-21", 5),
+            new AbstractMap.SimpleEntry<>("Feb-21", 5),
+            new AbstractMap.SimpleEntry<>("Mar-22", 40),
+            new AbstractMap.SimpleEntry<>("Apr-22", 50),
+            new AbstractMap.SimpleEntry<>("Jan-23", 5),
+            new AbstractMap.SimpleEntry<>("Feb-23", 5),
+            new AbstractMap.SimpleEntry<>("Mar-23", 40),
+            new AbstractMap.SimpleEntry<>("Apr-23", 50),
+            new AbstractMap.SimpleEntry<>("May-23", 70),
+            new AbstractMap.SimpleEntry<>("Jun-21", 10),
+            new AbstractMap.SimpleEntry<>("Jul-21", 20),
+            new AbstractMap.SimpleEntry<>("Aug-22", 50),
+            new AbstractMap.SimpleEntry<>("Sep-22", 22),
+            new AbstractMap.SimpleEntry<>("Oct-22", 70),
+            new AbstractMap.SimpleEntry<>("Nov-22", 50),
+            new AbstractMap.SimpleEntry<>("Dec-22", 0)
+        );
+
+        System.out.println(useCase1);
+        System.out.println("Use Case 1: " + generateFullYearData(useCase1));
+
+        // 🟢 Test Use Case 2: Should stop at the current month
+        Map<String, Integer> useCase2 = Map.of("Nov-22", 90, "Dec-22", 90, "Jan-23", 90);
+        System.out.println("Use Case 2: " + generateFullYearData(useCase2));
+
+        // 🟢 Test Use Case 3: Empty input should generate last 12 months from current month
+        System.out.println("Use Case 3: " + generateFullYearData(new HashMap<>()));
+    }
+}
