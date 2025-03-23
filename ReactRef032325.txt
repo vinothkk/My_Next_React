@@ -1,0 +1,550 @@
+123,412,341,234
+console.log(Number(123412341234).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+123,412,341,234.00
+
+
+To convert the number to millions and format it correctly, you need to divide it by 1,000,000 and then format it using toLocaleString. Here's how you can do it:
+
+const value = 123412341234;
+const millionValue = value / 1000000;
+
+console.log(millionValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "M");
+
+MUI
+import React from 'react';
+import { MaterialReactTable } from 'material-react-table';
+import { Tooltip } from '@mui/material';
+
+const MyTable = () => {
+  // Your data array
+  const data = [
+    { name: 'VinothKumar', age: 30, city: 'New York' },
+    { name: 'Vinoth', age: 25, city: 'Boston' },
+    { name: 'John', age: 40, city: 'Chicago' },
+    // more data...
+  ];
+  
+  // Column definitions with conditional tooltip and ellipsis
+  const columns = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      size: 100, // Sets width to 100px
+      Cell: ({ cell }) => {
+        const value = cell.getValue();
+        
+        // Create a reference element to check text width (we won't actually render this)
+        const textWidth = getTextWidth(value, '14px Arial'); // Adjust font to match your table
+        const needsEllipsis = textWidth > 100; // 100px is our column width
+        
+        // If text fits, render normally without tooltip or ellipsis
+        if (!needsEllipsis) {
+          return value;
+        }
+        
+        // If text doesn't fit, add ellipsis and tooltip
+        return (
+          <Tooltip title={value} placement="top">
+            <div
+              style={{
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100px'
+              }}
+            >
+              {value}
+            </div>
+          </Tooltip>
+        );
+      }
+    },
+    {
+      accessorKey: 'age',
+      header: 'Age',
+    },
+    {
+      accessorKey: 'city',
+      header: 'City',
+    },
+  ];
+  
+  // Helper function to calculate text width
+  const getTextWidth = (text, font) => {
+    // Create a canvas element to measure text width
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    context.font = font || getComputedStyle(document.body).font;
+    return context.measureText(text).width;
+  };
+
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={data}
+      enableFilters={true}
+    />
+  );
+};
+
+export default MyTable;
+
+============================================================================================================================
+import React from 'react';
+import { MaterialReactTable } from 'material-react-table';
+import { Tooltip } from '@mui/material';
+
+const MyTable = () => {
+  // Your data array
+  const data = [
+    { name: 'VinothKumar', age: 30, city: 'New York' },
+    { name: 'Jane Smith', age: 25, city: 'Boston' },
+    // more data...
+  ];
+  
+  // Column definitions with width and cell rendering for tooltips
+  const columns = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      size: 100, // Sets width to 100px
+      Cell: ({ cell }) => {
+        const value = cell.getValue();
+        return (
+          <Tooltip title={value} placement="top">
+            <div
+              style={{
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100px' // Match the column width
+              }}
+            >
+              {value}
+            </div>
+          </Tooltip>
+        );
+      }
+    },
+    {
+      accessorKey: 'age',
+      header: 'Age',
+    },
+    {
+      accessorKey: 'city',
+      header: 'City',
+    },
+  ];
+
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={data}
+      enableFilters={true}
+    />
+  );
+};
+
+export default MyTable;
+
+
+====================================
+but both the approach we will get the filtered data for this data={data} 
+because while doing colum search filter  how the data will get filtered ?
+
+Edit
+I see your concern. Let me clarify how the filtering actually works in MaterialReactTable.
+
+When you apply column filters in MaterialReactTable, the filtering happens internally within the table component. The original data array you provide (data={data}) doesn't change, but MaterialReactTable maintains its own internal filtered view of that data.
+
+Here's what's actually happening:
+
+You provide the original data array: data={data}
+When a user applies a column filter, MaterialReactTable internally filters this data
+The filtered results are used for display, but your original data state remains unchanged
+To access these filtered results, you need to get them from the table instance
+Let me show you a complete working example that demonstrates how the filtering happens and how you can access the filtered data:
+
+
+
+import React, { useState, useEffect } from 'react';
+import { MaterialReactTable } from 'material-react-table';
+
+const MyTable = () => {
+  // Original data that never changes when filtering
+  const [data, setData] = useState([
+    { name: 'John', age: 30, city: 'New York' },
+    { name: 'Jane', age: 25, city: 'Boston' },
+    { name: 'Bob', age: 40, city: 'Chicago' },
+    // more data...
+  ]);
+  
+  // State to track filters
+  const [columnFilters, setColumnFilters] = useState([]);
+  
+  // State to hold the filtered data
+  const [filteredData, setFilteredData] = useState([]);
+  
+  // Columns definition
+  const columns = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+    },
+    {
+      accessorKey: 'age',
+      header: 'Age',
+    },
+    {
+      accessorKey: 'city',
+      header: 'City',
+    },
+  ];
+
+  return (
+    <div>
+      <MaterialReactTable
+        columns={columns}
+        data={data}
+        enableFilters={true}
+        state={{ columnFilters }}
+        onColumnFiltersChange={setColumnFilters}
+        renderTopToolbarCustomActions={({ table }) => {
+          // Get the filtered rows whenever filters change
+          const currentFilteredData = table.getFilteredRowModel().rows.map(row => row.original);
+          
+          // Update our state with the filtered data
+          useEffect(() => {
+            setFilteredData(currentFilteredData);
+            console.log("Filtered data:", currentFilteredData);
+          }, [currentFilteredData]);
+          
+          return (
+            <div>
+              <p>Total rows: {data.length}</p>
+              <p>Filtered rows: {currentFilteredData.length}</p>
+            </div>
+          );
+        }}
+      />
+      
+      {/* Display filtered data outside the table if needed */}
+      <div>
+        <h3>Filtered Data ({filteredData.length} rows):</h3>
+        <pre>{JSON.stringify(filteredData, null, 2)}</pre>
+      </div>
+    </div>
+  );
+};
+
+
+==========================Question++++++++++++++++++++++
+if we doing this approach the value is not getting filterd in the datable how the data get filter
+import { useState, useEffect } from 'react';
+import { MaterialReactTable } from 'material-react-table';
+const MyTable = () => {
+  const [data, setData] = useState([]); // Your original data
+  const [filteredData, setFilteredData] = useState([]);
+  const [columnFilters, setColumnFilters] = useState([]);
+  // This effect will run whenever the columnFilters state changes
+  useEffect(() => {
+    // The table already handles the filtering internally, but you can access the 
+    // filtered data through the getMaterialReactTableProps().rows property
+    // This is just to update your state with the filtered data
+    if (tableInstanceRef.current) {
+      setFilteredData(tableInstanceRef.current.getFilteredRowModel().rows.map(row => row.original));
+    }
+  }, [columnFilters]);
+  // Create a ref to access the table instance
+  const tableInstanceRef = useRef(null);
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={data}
+      enableFilters={true}
+      onColumnFiltersChange={setColumnFilters}
+      // Store the table instance ref to access filtered data
+      tableInstanceRef={tableInstanceRef}
+      // Alternatively, you can use the getFilteredRowModel
+      // getMaterialReactTableProps and rows
+    />
+  );
+};
+I see the issue. In your code, you're setting up the state and refs correctly, but there's a problem with how the table instance is being accessed. MaterialReactTable in recent versions uses a different approach to get the table instance. Let me fix that for you:
+
+
+import { useState, useEffect, useRef } from 'react';
+import { MaterialReactTable } from 'material-react-table';
+
+const MyTable = () => {
+  const [data, setData] = useState([]); // Your original data
+  const [filteredData, setFilteredData] = useState([]);
+  const [columnFilters, setColumnFilters] = useState([]);
+  
+  // Create a ref to access the table instance
+  const tableInstanceRef = useRef(null);
+
+  // This effect will run whenever the columnFilters state changes
+  useEffect(() => {
+    // Only update filteredData if we have a table instance
+    if (tableInstanceRef.current) {
+      const filteredRows = tableInstanceRef.current.getFilteredRowModel().rows;
+      setFilteredData(filteredRows.map(row => row.original));
+    }
+  }, [columnFilters]);
+
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={data}
+      enableFilters={true}
+      onColumnFiltersChange={setColumnFilters}
+      state={{ columnFilters }} // Important: connect the filters state to the table
+      enableRowSelection={false} // Optional, just for example
+      muiTableProps={{
+        ref: (table) => {
+          // This is not the correct way to get the instance in MaterialReactTable
+          // We need to use the tableInstanceRef prop instead
+        }
+      }}
+      tableInstanceRef={tableInstanceRef} // This is the correct prop to access the table instance
+    />
+  );
+};
+
+------------------------------------------------------------------
+In MaterialReactTable while doing column  filter how to get the filtered data in the table, My current configuration of the table like <MaterialReactTable data={data}, columns={columns} enableFilters={true}/> Can you tell me which prop method i need to use to get the  filter data
+
+To get the filtered data in MaterialReactTable, you can use the onGlobalFilterChange or onColumnFiltersChange props along with state management. Here's how you can implement this:
+import { useState, useEffect } from 'react';
+import { MaterialReactTable } from 'material-react-table';
+
+const MyTable = () => {
+  const [data, setData] = useState([]); // Your original data
+  const [filteredData, setFilteredData] = useState([]);
+  const [columnFilters, setColumnFilters] = useState([]);
+
+  // This effect will run whenever the columnFilters state changes
+  useEffect(() => {
+    // The table already handles the filtering internally, but you can access the 
+    // filtered data through the getMaterialReactTableProps().rows property
+    // This is just to update your state with the filtered data
+    if (tableInstanceRef.current) {
+      setFilteredData(tableInstanceRef.current.getFilteredRowModel().rows.map(row => row.original));
+    }
+  }, [columnFilters]);
+
+  // Create a ref to access the table instance
+  const tableInstanceRef = useRef(null);
+
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={data}
+      enableFilters={true}
+      onColumnFiltersChange={setColumnFilters}
+      // Store the table instance ref to access filtered data
+      tableInstanceRef={tableInstanceRef}
+      // Alternatively, you can use the getFilteredRowModel
+      // getMaterialReactTableProps and rows
+    />
+  );
+};
+If you want to access the filtered data directly from the table, another approach is using the manualFiltering prop with your own filtering logic:
+---------------
+const [data, setData] = useState([]); // Your original data
+const [filteredData, setFilteredData] = useState([]);
+const [columnFilters, setColumnFilters] = useState([]);
+
+// Implement your custom filtering logic here
+const handleColumnFiltersChange = (updatedFilters) => {
+  setColumnFilters(updatedFilters);
+  
+  let filtered = [...data];
+  
+  // Apply each filter
+  updatedFilters.forEach(filter => {
+    const { id, value } = filter;
+    filtered = filtered.filter(row => {
+      return String(row[id]).toLowerCase().includes(String(value).toLowerCase());
+    });
+  });
+  
+  setFilteredData(filtered);
+};
+
+return (
+  <>
+    <MaterialReactTable
+      columns={columns}
+      data={data}
+      enableFilters={true}
+      onColumnFiltersChange={handleColumnFiltersChange}
+    />
+    {/* Now you can use filteredData in other components or display it */}
+  </>
+);
+===========================================================================================================================
+const [data, setData] = useState([]); // Your original data
+const [filteredData, setFilteredData] = useState([]);
+const [columnFilters, setColumnFilters] = useState([]);
+
+// Implement your custom filtering logic here
+const handleColumnFiltersChange = (updatedFilters) => {
+  setColumnFilters(updatedFilters);
+  
+  let filtered = [...data];
+  
+  // Apply each filter
+  updatedFilters.forEach(filter => {
+    const { id, value } = filter;
+    filtered = filtered.filter(row => {
+      return String(row[id]).toLowerCase().includes(String(value).toLowerCase());
+    });
+  });
+  
+  setFilteredData(filtered);
+};
+
+return (
+  <>
+    <MaterialReactTable
+      columns={columns}
+      data={data}
+      enableFilters={true}
+      onColumnFiltersChange={handleColumnFiltersChange}
+    />
+    {/* Now you can use filteredData in other components or display it */}
+  </>
+);
+
+
+const [tableState, setTableState] = useState({
+  columnFilters: [],
+  // other state properties you might need
+});
+
+return (
+  <MaterialReactTable
+    columns={columns}
+    data={data}
+    enableFilters={true}
+    state={tableState}
+    onStateChange={setTableState}
+    // Now you can access tableState.columnFilters to track the current filters
+  />
+);
+
+==============================
+import { useMemo, useState, useEffect } from "react";
+import { MaterialReactTable } from "material-react-table";
+
+const initialData = [
+  {
+    name: { firstName: "John", lastName: "Doe" },
+    address: "261 Erdman Ford",
+    city: "East Daphne",
+    state: "Kentucky",
+  },
+  {
+    name: { firstName: "Jane", lastName: "Doe" },
+    address: "769 Dominic Grove",
+    city: "Columbus",
+    state: "Ohio",
+  },
+  {
+    name: { firstName: "Joe", lastName: "Doe" },
+    address: "566 Brakus Inlet",
+    city: "South Linda",
+    state: "West Virginia",
+  },
+  {
+    name: { firstName: "Kevin", lastName: "Vandy" },
+    address: "722 Emie Stream",
+    city: "Lincoln",
+    state: "Nebraska",
+  },
+  {
+    name: { firstName: "Joshua", lastName: "Rolluffs" },
+    address: "32188 Larkin Turnpike",
+    city: "Omaha",
+    state: "Nebraska",
+  },
+];
+
+const Example = () => {
+  // State for the table filters and sorting
+  const [columnFilters, setColumnFilters] = useState([]);
+  const [sorting, setSorting] = useState([]);
+  const [filteredSortedData, setFilteredSortedData] = useState([
+    ...initialData,
+  ]);
+
+  const columns = useMemo(
+    () => [
+      { accessorKey: "name.firstName", header: "First Name", size: 150 },
+      { accessorKey: "name.lastName", header: "Last Name", size: 150 },
+      { accessorKey: "address", header: "Address", size: 200 },
+      { accessorKey: "city", header: "City", size: 150 },
+      { accessorKey: "state", header: "State", size: 150 },
+    ],
+    []
+  );
+
+  // Use useEffect to apply filtering whenever columnFilters changes
+  useEffect(() => {
+    console.log("Filters changed:", columnFilters);
+
+    // Apply filters
+    let filtered = [...initialData];
+
+    for (const filter of columnFilters) {
+      const { id, value } = filter;
+
+      filtered = filtered.filter((row) => {
+        if (id.includes(".")) {
+          const [parent, child] = id.split(".");
+          return row[parent][child].toLowerCase().includes(value.toLowerCase());
+        } else {
+          return row[id].toLowerCase().includes(value.toLowerCase());
+        }
+      });
+    }
+
+    // Set the filtered data
+    setFilteredSortedData(filtered);
+  }, [columnFilters]);
+
+  return (
+    <>
+      <MaterialReactTable
+        columns={columns}
+        data={initialData}
+        enableFilters
+        enableColumnFilters
+        state={{
+          columnFilters,
+          sorting,
+        }}
+        onColumnFiltersChange={setColumnFilters}
+        onSortingChange={setSorting}
+        muiTableHeadCellFilterTextFieldProps={{
+          onChange: (e) => {
+            console.log("Filter input changed:", e.target.value);
+          },
+          variant: "outlined",
+        }}
+      />
+      <pre>
+        Filtered & Sorted Data: {JSON.stringify(filteredSortedData, null, 2)}
+      </pre>
+    </>
+  );
+};
+
+export default Example;
+
+
+
+
