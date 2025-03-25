@@ -561,10 +561,9 @@ export default useFilteredData;
             }
 
 ==================Final================
-import { useState, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 
-const useFilteredData = (data, columnFilters) => {
-    const [filteredData, setFilteredData] = useState([]);
+const useFilteredData = (data = [], columnFilters = []) => {
     const [metrics, setMetrics] = useState({
         totalRevenue: 0,
         totalWeightedRevenue: 0,
@@ -572,80 +571,111 @@ const useFilteredData = (data, columnFilters) => {
         totalOpportunities: 0,
     });
 
-    // Function to filter data based on column filters
-    const filterData = (data, columnFilters) => {
-        let filtered = [...data];
+    const filteredData = useMemo(() => {
+        if (!Array.isArray(data) || data.length === 0) return { filtered: [], totalRevenue: 0, totalWeightedRevenue: 0, totalProbability: 0, totalOpportunities: 0 };
+        if (!Array.isArray(columnFilters)) return { filtered: [], totalRevenue: 0, totalWeightedRevenue: 0, totalProbability: 0, totalOpportunities: 0 };
 
-        for (const filter of columnFilters) {
-            const { id, value } = filter;
+        let filtered = new Array(data.length); // Preallocate array
+        let count = 0;
 
-            filtered = filtered.filter((row) => {
-                if (id === "Close Date") return row;
+        let totalRevenue = 0,
+            totalWeightedRevenue = 0,
+            totalProbability = 0,
+            totalOpportunities = 0;
 
-                if (id === "amount") {
-                    return parseInt(row[id] ?? 0) >= (value ?? 0);
+        // Extract Close Date filter
+        const tempDate1 = JSON.stringify(columnFilters);
+        const tempDate2 = JSON.parse(tempDate1);
+        const extractedDates = tempDate2.find(item => item.id === "Close Date")?.value || [];
+
+        const fromDate = extractedDates[0] ? extractedDates[0].split("T")[0] : null;
+        const toDate = extractedDates[1] ? extractedDates[1].split("T")[0] : null;
+
+        for (let i = 0; i < data.length; i++) {
+            let row = data[i];
+            if (!row) continue; // Safety check to prevent accessing null/undefined rows
+
+            let isValid = true;
+
+            for (const filter of columnFilters) {
+                const { id, value } = filter;
+                if (!id || value === undefined || value === null) continue; // Ignore invalid filters
+
+                let rowValue = row?.[id] ?? ""; // Handle `null` or `undefined`
+
+                if (id === "Close Date") {
+                    const currentDate = row?.closeDate ? row.closeDate.split("T")[0] : null;
+
+                    if ((!fromDate || currentDate >= fromDate) && (!toDate || currentDate <= toDate)) {
+                        continue;
+                    } else {
+                        isValid = false;
+                        break;
+                    }
                 }
 
-                if (id === "probability") {
-                    return parseInt(row[id] ?? 0) >= (value[0] ?? 0) &&
-                        parseInt(row[id] ?? 0) <= (value[1] ?? 100);
+                if (typeof rowValue === "number") {
+                    rowValue = rowValue.toString(); // Convert numbers to string for comparison
                 }
 
-                if (row[id] != null && id !== "probability" && id !== "amount" && id !== "Close Date") {
-                    return row[id]?.toLowerCase().includes(value?.toLowerCase());
+                // Dynamic Filtering Based on Type
+                if (typeof value === "string") {
+                    if (!rowValue.toLowerCase().includes(value.toLowerCase())) {
+                        isValid = false;
+                        break;
+                    }
+                } else if (Array.isArray(value) && value.length === 2) {
+                    // Handle range filters (e.g., probability: [30, 80])
+                    const numValue = parseFloat(rowValue) || 0;
+                    if (numValue < value[0] || numValue > value[1]) {
+                        isValid = false;
+                        break;
+                    }
+                } else if (typeof value === "number") {
+                    if (parseFloat(rowValue) < value) {
+                        isValid = false;
+                        break;
+                    }
                 }
-            });
+            }
+
+            if (isValid) {
+                filtered[count++] = row; // Store valid rows efficiently
+                totalRevenue += parseInt(row?.totalProjectedAnnualizedRevenue ?? 0);
+                totalWeightedRevenue += parseInt(row?.projectedWeightedRevenue ?? 0);
+                totalProbability += parseInt(row?.probability ?? 0);
+                totalOpportunities++;
+            }
         }
-        return filtered;
-    };
-
-    // Function to filter data by date
-    const filterByDate = (data, fromDate, toDate) => {
-        return data.filter((item) => {
-            const currentData = item.closeDate;
-            return (!fromDate || currentData >= fromDate) && (!toDate || currentData <= toDate);
-        });
-    };
-
-    // Function to calculate metrics
-    const calculateMetrics = (filtered) => {
-        const totalOpportunities = filtered.length ?? 0;
-        const totalProjectedTotalRevenue = filtered.reduce(
-            (sum, revenue) => sum + parseInt(revenue?.totalProjectedAnnualizedRevenue ?? 0), 0
-        );
-        const totalProjectedWeightedRevenue = filtered.reduce(
-            (sum, revenue) => sum + parseInt(revenue?.projectedWeightedRevenue ?? 0), 0
-        );
-        const totalProjectedAVGProbability = filtered.reduce(
-            (sum, revenue) => sum + parseInt(revenue?.probability ?? 0), 0
-        );
 
         return {
+            filtered: filtered.slice(0, count),
+            totalRevenue,
+            totalWeightedRevenue,
+            totalProbability,
             totalOpportunities,
-            totalProjectedTotalRevenue,
-            totalProjectedWeightedRevenue,
-            averageProbability: totalOpportunities > 0 ? (totalProjectedAVGProbability / totalOpportunities).toFixed(2) : 0
         };
-    };
-
-    useEffect(() => {
-        let filtered = filterData(data, columnFilters);
-
-        const extractedDates = columnFilters.find(item => item.id === "Close Date")?.value || [];
-        const fromDate = extractedDates[0]?.split("T")[0] ?? null;
-        const toDate = extractedDates[1]?.split("T")[0] ?? null;
-
-        if (fromDate || toDate) {
-            filtered = filterByDate(filtered, fromDate, toDate);
-        }
-
-        setFilteredData(filtered);
-        setMetrics(calculateMetrics(filtered));
     }, [data, columnFilters]);
 
-    return { filteredData, ...metrics };
+    // ✅ Use useEffect to update state safely
+    useEffect(() => {
+        if (!filteredData) return; // ✅ Prevent accessing undefined
+
+        setMetrics({
+            totalRevenue: filteredData.totalRevenue,
+            totalWeightedRevenue: filteredData.totalWeightedRevenue,
+            totalOpportunities: filteredData.totalOpportunities,
+            averageProbability:
+                filteredData.totalOpportunities > 0
+                    ? (filteredData.totalProbability / filteredData.totalOpportunities).toFixed(2)
+                    : 0,
+        });
+    }, [filteredData]);
+
+    return { filteredData: filteredData.filtered, ...metrics };
 };
 
 export default useFilteredData;
+
 
 
