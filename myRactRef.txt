@@ -412,4 +412,101 @@ const useFilteredData = (data, columnFilters) => {
 
 export default useFilteredData;
 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import { useState, useMemo, useEffect } from "react";
+
+const useFilteredData = (data = [], columnFilters = []) => {
+    const [metrics, setMetrics] = useState({
+        totalRevenue: 0,
+        totalWeightedRevenue: 0,
+        averageProbability: 0,
+        totalOpportunities: 0,
+    });
+
+    const filteredData = useMemo(() => {
+        if (!Array.isArray(data) || data.length === 0) return { filtered: [], totalRevenue: 0, totalWeightedRevenue: 0, totalProbability: 0, totalOpportunities: 0 };
+        if (!Array.isArray(columnFilters)) return { filtered: [], totalRevenue: 0, totalWeightedRevenue: 0, totalProbability: 0, totalOpportunities: 0 };
+
+        let filtered = new Array(data.length); // Preallocate array
+        let count = 0;
+
+        let totalRevenue = 0,
+            totalWeightedRevenue = 0,
+            totalProbability = 0,
+            totalOpportunities = 0;
+
+        for (let i = 0; i < data.length; i++) {
+            let row = data[i];
+            if (!row) continue; // Safety check to prevent accessing null/undefined rows
+
+            let isValid = true;
+
+            for (const filter of columnFilters) {
+                const { id, value } = filter;
+                if (!id || value === undefined || value === null) continue; // Ignore invalid filters
+
+                let rowValue = row?.[id] ?? ""; // Handle `null` or `undefined`
+
+                if (typeof rowValue === "number") {
+                    rowValue = rowValue.toString(); // Convert numbers to string for comparison
+                }
+
+                // Dynamic Filtering Based on Type
+                if (typeof value === "string") {
+                    if (!rowValue.toLowerCase().includes(value.toLowerCase())) {
+                        isValid = false;
+                        break;
+                    }
+                } else if (Array.isArray(value) && value.length === 2) {
+                    // Handle range filters (e.g., probability: [30, 80])
+                    const numValue = parseFloat(rowValue) || 0;
+                    if (numValue < value[0] || numValue > value[1]) {
+                        isValid = false;
+                        break;
+                    }
+                } else if (typeof value === "number") {
+                    if (parseFloat(rowValue) < value) {
+                        isValid = false;
+                        break;
+                    }
+                }
+            }
+
+            if (isValid) {
+                filtered[count++] = row; // Store valid rows efficiently
+                totalRevenue += parseInt(row?.totalProjectedAnnualizedRevenue ?? 0);
+                totalWeightedRevenue += parseInt(row?.projectedWeightedRevenue ?? 0);
+                totalProbability += parseInt(row?.probability ?? 0);
+                totalOpportunities++;
+            }
+        }
+
+        return {
+            filtered: filtered.slice(0, count),
+            totalRevenue,
+            totalWeightedRevenue,
+            totalProbability,
+            totalOpportunities,
+        };
+    }, [data, columnFilters]);
+
+    // ✅ Use useEffect to update state safely
+    useEffect(() => {
+        if (!filteredData) return; // ✅ Prevent accessing undefined
+
+        setMetrics({
+            totalRevenue: filteredData.totalRevenue,
+            totalWeightedRevenue: filteredData.totalWeightedRevenue,
+            totalOpportunities: filteredData.totalOpportunities,
+            averageProbability:
+                filteredData.totalOpportunities > 0
+                    ? (filteredData.totalProbability / filteredData.totalOpportunities).toFixed(2)
+                    : 0,
+        });
+    }, [filteredData]);
+
+    return { filteredData: filteredData.filtered, ...metrics };
+};
+
+export default useFilteredData;
 
