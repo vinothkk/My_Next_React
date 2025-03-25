@@ -560,4 +560,92 @@ export default useFilteredData;
                 }
             }
 
+==================Final================
+import { useState, useEffect } from "react";
+
+const useFilteredData = (data, columnFilters) => {
+    const [filteredData, setFilteredData] = useState([]);
+    const [metrics, setMetrics] = useState({
+        totalRevenue: 0,
+        totalWeightedRevenue: 0,
+        averageProbability: 0,
+        totalOpportunities: 0,
+    });
+
+    // Function to filter data based on column filters
+    const filterData = (data, columnFilters) => {
+        let filtered = [...data];
+
+        for (const filter of columnFilters) {
+            const { id, value } = filter;
+
+            filtered = filtered.filter((row) => {
+                if (id === "Close Date") return row;
+
+                if (id === "amount") {
+                    return parseInt(row[id] ?? 0) >= (value ?? 0);
+                }
+
+                if (id === "probability") {
+                    return parseInt(row[id] ?? 0) >= (value[0] ?? 0) &&
+                        parseInt(row[id] ?? 0) <= (value[1] ?? 100);
+                }
+
+                if (row[id] != null && id !== "probability" && id !== "amount" && id !== "Close Date") {
+                    return row[id]?.toLowerCase().includes(value?.toLowerCase());
+                }
+            });
+        }
+        return filtered;
+    };
+
+    // Function to filter data by date
+    const filterByDate = (data, fromDate, toDate) => {
+        return data.filter((item) => {
+            const currentData = item.closeDate;
+            return (!fromDate || currentData >= fromDate) && (!toDate || currentData <= toDate);
+        });
+    };
+
+    // Function to calculate metrics
+    const calculateMetrics = (filtered) => {
+        const totalOpportunities = filtered.length ?? 0;
+        const totalProjectedTotalRevenue = filtered.reduce(
+            (sum, revenue) => sum + parseInt(revenue?.totalProjectedAnnualizedRevenue ?? 0), 0
+        );
+        const totalProjectedWeightedRevenue = filtered.reduce(
+            (sum, revenue) => sum + parseInt(revenue?.projectedWeightedRevenue ?? 0), 0
+        );
+        const totalProjectedAVGProbability = filtered.reduce(
+            (sum, revenue) => sum + parseInt(revenue?.probability ?? 0), 0
+        );
+
+        return {
+            totalOpportunities,
+            totalProjectedTotalRevenue,
+            totalProjectedWeightedRevenue,
+            averageProbability: totalOpportunities > 0 ? (totalProjectedAVGProbability / totalOpportunities).toFixed(2) : 0
+        };
+    };
+
+    useEffect(() => {
+        let filtered = filterData(data, columnFilters);
+
+        const extractedDates = columnFilters.find(item => item.id === "Close Date")?.value || [];
+        const fromDate = extractedDates[0]?.split("T")[0] ?? null;
+        const toDate = extractedDates[1]?.split("T")[0] ?? null;
+
+        if (fromDate || toDate) {
+            filtered = filterByDate(filtered, fromDate, toDate);
+        }
+
+        setFilteredData(filtered);
+        setMetrics(calculateMetrics(filtered));
+    }, [data, columnFilters]);
+
+    return { filteredData, ...metrics };
+};
+
+export default useFilteredData;
+
 
