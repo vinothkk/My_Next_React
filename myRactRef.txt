@@ -117,3 +117,117 @@ const Pipeline = ({ data }) => {
 };
 
 export default Expo
+===========================
+import { useState, useMemo } from "react";
+
+const useFilteredData = (data, columnFilters) => {
+    const [metrics, setMetrics] = useState({
+        totalRevenue: 0,
+        totalWeightedRevenue: 0,
+        averageProbability: 0,
+        totalOpportunities: 0,
+    });
+
+    const filteredData = useMemo(() => {
+        if (!Array.isArray(data) || data.length === 0) return [];
+
+        let filtered = new Array(data.length); // Preallocate array
+        let count = 0;
+
+        let totalRevenue = 0,
+            totalWeightedRevenue = 0,
+            totalProbability = 0,
+            totalOpportunities = 0;
+
+        for (let i = 0; i < data.length; i++) {
+            let row = data[i];
+            let isValid = true;
+
+            for (const filter of columnFilters) {
+                const { id, value } = filter;
+                if (!id || value === undefined || value === null) continue; // Ignore invalid filters
+
+                let rowValue = row?.[id] ?? ""; // Handle `null` or `undefined`
+
+                if (typeof rowValue === "number") {
+                    rowValue = rowValue.toString(); // Convert numbers to string for comparison
+                }
+
+                // Dynamic Filtering Based on Type
+                if (typeof value === "string") {
+                    if (!rowValue.toLowerCase().includes(value.toLowerCase())) {
+                        isValid = false;
+                        break;
+                    }
+                } else if (Array.isArray(value) && value.length === 2) {
+                    // Handle range filters (e.g., probability: [30, 80])
+                    const numValue = parseFloat(rowValue) || 0;
+                    if (numValue < value[0] || numValue > value[1]) {
+                        isValid = false;
+                        break;
+                    }
+                } else if (typeof value === "number") {
+                    if (parseFloat(rowValue) < value) {
+                        isValid = false;
+                        break;
+                    }
+                }
+            }
+
+            if (isValid) {
+                filtered[count++] = row; // Store valid rows efficiently
+                totalRevenue += parseInt(row?.totalProjectedAnnualizedRevenue ?? 0);
+                totalWeightedRevenue += parseInt(row?.projectedWeightedRevenue ?? 0);
+                totalProbability += parseInt(row?.probability ?? 0);
+                totalOpportunities++;
+            }
+        }
+
+        setMetrics({
+            totalOpportunities,
+            totalRevenue,
+            totalWeightedRevenue,
+            averageProbability: totalOpportunities > 0 ? (totalProbability / totalOpportunities).toFixed(2) : 0,
+        });
+
+        return filtered.slice(0, count); // Trim unused space
+    }, [data, columnFilters]);
+
+    return { filteredData, ...metrics };
+};
+
+export default useFilteredData;
+
+
+import React, { useState } from "react";
+import useFilteredData from "../hooks/useFilteredData";
+
+const Pipeline = ({ data }) => {
+    const [columnFilters, setColumnFilters] = useState([
+        { id: "amount", value: 5000 },
+        { id: "probability", value: [30, 80] },
+        { id: "name", value: "John" }, // Dynamic field filter
+    ]);
+
+    const { filteredData, totalRevenue, totalWeightedRevenue, averageProbability, totalOpportunities } =
+        useFilteredData(data, columnFilters);
+
+    return (
+        <div>
+            <h2>Filtered Data</h2>
+            <p>Total Opportunities: {totalOpportunities}</p>
+            <p>Total Revenue: ${totalRevenue}</p>
+            <p>Total Weighted Revenue: ${totalWeightedRevenue}</p>
+            <p>Average Probability: {averageProbability}%</p>
+
+            <ul>
+                {filteredData.map((item, index) => (
+                    <li key={index}>{item.name} - ${item.amount}</li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+export default Pipeline;
+
