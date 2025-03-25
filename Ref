@@ -1,0 +1,48 @@
+import org.springframework.web.bind.annotation.*;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/api")
+public class DateSortingController {
+
+    @GetMapping("/sort-dates")
+    public Map<String, Integer> sortPercentageData() {
+        Map<String, Integer> percentageData = new HashMap<>();
+        percentageData.put("Jun-22", 5);
+        percentageData.put("Jul-21", 5);
+        percentageData.put("Jun-21", 5);
+        percentageData.put("Apr-22", 5);
+        percentageData.put("Jul-22", 5);
+        percentageData.put("Feb-22", 5);
+        percentageData.put("Jan-22", 5);
+        percentageData.put("Jan-23", 5);
+        percentageData.put("Sep-22", 5);
+        percentageData.put("Sep-21", 5);
+        percentageData.put("Dec-21", 5);
+        percentageData.put("Dec-22", 5);
+        percentageData.put("Aug-22", 5);
+        percentageData.put("Aug-21", 5);
+        percentageData.put("Nov-22", 5);
+        percentageData.put("May-21", 5);
+        percentageData.put("Oct-22", 5);
+        percentageData.put("Nov-21", 5);
+        percentageData.put("Oct-21", 5);
+        percentageData.put("May-22", 5);
+        percentageData.put("Mar-22", 5);
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM-yy", Locale.ENGLISH);
+
+        return percentageData.entrySet()
+            .stream()
+            .sorted(Comparator.comparing(entry -> YearMonth.parse(entry.getKey(), formatter)))
+            .collect(Collectors.toMap(
+                Map.Entry::getKey, 
+                Map.Entry::getValue, 
+                (e1, e2) -> e1, 
+                LinkedHashMap::new
+            ));
+    }
+}
