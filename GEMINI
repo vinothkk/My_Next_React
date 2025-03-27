@@ -1,4 +1,77 @@
 import React, { useMemo, useState } from "react";
+import MaterialReactTable, { filterFns } from "material-react-table";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
+
+const YourComponent = () => {
+    // ... your data
+
+    const [minDate, setMinDate] = useState(null);
+    const [maxDate, setMaxDate] = useState(null);
+
+    const columns = useMemo(() => [
+        {
+            accessorFn: (originalRow) => new Date(originalRow.closeDate),
+            accessorKey: "Close Date",
+            header: "Close Date",
+            filterVariant: "date-range",
+            filterFn: filterFns.betweenDates, // Use filterFns.betweenDates
+            muiFilterDatePickerProps: ({ rangePosition }) => ({
+                minDate: rangePosition === "end" && minDate ? dayjs(minDate) : null,
+                maxDate: rangePosition === "start" && maxDate ? dayjs(maxDate) : null,
+                onChange: (newValue) => {
+                    if (rangePosition === "start") {
+                        if (maxDate && dayjs(newValue).isAfter(maxDate)) {
+                            setMaxDate(null);
+                        }
+                        setMinDate(newValue);
+                    } else if (rangePosition === "end") {
+                        if (minDate && dayjs(newValue).isBefore(minDate)) {
+                            setMinDate(null);
+                        }
+                        setMaxDate(newValue);
+                    }
+                },
+            }),
+        },
+    ], [minDate, maxDate]);
+
+    return (
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <MaterialReactTable
+                columns={columns}
+                data={data}
+                enableColumnFilters
+                state={{
+                    columnFilters: [
+                        {
+                            id: "Close Date",
+                            value: [minDate, maxDate],
+                        },
+                    ],
+                }}
+                onColumnFiltersChange={(columnFilters) => {
+                    const dateFilter = columnFilters.find((filter) => filter.id === "Close Date");
+                    if (dateFilter && dateFilter.value) {
+                        const [newMinDate, newMaxDate] = dateFilter.value;
+                        setMinDate(newMinDate);
+                        setMaxDate(newMaxDate);
+                    } else {
+                        setMinDate(null);
+                        setMaxDate(null);
+                    }
+                }}
+            />
+        </LocalizationProvider>
+    );
+};
+
+export default YourComponent;
+
+-------------------------------------------------------------------------------
+
+import React, { useMemo, useState } from "react";
 import MaterialReactTable from "material-react-table";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
