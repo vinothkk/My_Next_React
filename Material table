@@ -1,0 +1,119 @@
+import React, { useMemo, useState } from 'react';
+import MaterialReactTable, { 
+  type MRT_ColumnDef,
+  type MRT_TableOptions,
+} from 'material-react-table';
+import { parseISO, isAfter, isBefore } from 'date-fns';
+
+interface YourDataType {
+  id: number;
+  dateColumn: string; // or Date
+}
+
+const YourComponent = () => {
+  // Sample data
+  const [data, setData] = useState<YourDataType[]>([
+    { id: 1, dateColumn: '2023-01-01' },
+    // ... more data
+  ]);
+
+  const columns = useMemo<MRT_ColumnDef<YourDataType>[]>(() => [
+    {
+      accessorKey: 'dateColumn',
+      header: 'Date Column',
+      filterVariant: 'date-range',
+      
+      // Custom filter function for date range
+      filterFn: (row, columnId, filterValue) => {
+        const rowValue = parseISO(row.getValue(columnId));
+        const [minDate, maxDate] = filterValue;
+
+        // If no filter applied, return true
+        if (!minDate && !maxDate) return true;
+
+        // Convert to Date objects if they're strings
+        const parsedMinDate = minDate ? parseISO(minDate) : null;
+        const parsedMaxDate = maxDate ? parseISO(maxDate) : null;
+
+        // Validation logic
+        if (parsedMinDate && parsedMaxDate) {
+          // Ensure min date is not after max date
+          if (isAfter(parsedMinDate, parsedMaxDate)) {
+            // Reset the filter or show an error
+            return false;
+          }
+        }
+
+        // Apply standard date range filtering
+        const isAboveMin = !parsedMinDate || !isBefore(rowValue, parsedMinDate);
+        const isBelowMax = !parsedMaxDate || !isAfter(rowValue, parsedMaxDate);
+
+        return isAboveMin && isBelowMax;
+      },
+      
+      // Optional: Customize filter component to enforce validation
+      Filter: ({ column }) => {
+        const { filterValue, setFilterValue } = column;
+        
+        const handleDateChange = (newDates) => {
+          const [minDate, maxDate] = newDates;
+          
+          // Validate date range
+          if (minDate && maxDate) {
+            const parsedMinDate = parseISO(minDate);
+            const parsedMaxDate = parseISO(maxDate);
+            
+            // If min date is after max date, reset or show error
+            if (isAfter(parsedMinDate, parsedMaxDate)) {
+              // Option 1: Reset filter
+              setFilterValue([null, null]);
+              
+              // Option 2: Show an error (you'd need to implement error display)
+              // For example, using a snackbar or toast notification
+              console.error('Minimum date cannot be after maximum date');
+              
+              return;
+            }
+          }
+          
+          // Set the filter value
+          setFilterValue(newDates);
+        };
+
+        return (
+          <div>
+            {/* Default date range filter component */}
+            <input
+              type="date"
+              value={filterValue?.[0] || ''}
+              onChange={(e) => {
+                const newMinDate = e.target.value;
+                handleDateChange([newMinDate, filterValue?.[1]]);
+              }}
+            />
+            <input
+              type="date"
+              value={filterValue?.[1] || ''}
+              onChange={(e) => {
+                const newMaxDate = e.target.value;
+                handleDateChange([filterValue?.[0], newMaxDate]);
+              }}
+            />
+          </div>
+        );
+      },
+    },
+  ], []);
+
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={data}
+      // Additional configuration
+      enableColumnFilters
+      enableFilters
+    />
+  );
+};
+
+export default YourComponent;
