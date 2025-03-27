@@ -1,3 +1,139 @@
+import React, { useMemo, useState } from 'react';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import MaterialReactTable from 'material-react-table';
+import dayjs from 'dayjs';
+
+const DynamicDateRangeFilter = () => {
+  // Sample data with dates
+  const [data, setData] = useState([
+    { id: 1, date: '2023-01-01' },
+    { id: 2, date: '2023-06-15' },
+    { id: 3, date: '2024-02-20' },
+    { id: 4, date: '2024-03-15' },
+    { id: 5, date: '2024-04-10' },
+  ]);
+
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'date',
+      header: 'Date',
+      filterVariant: 'date-range',
+      
+      // Custom filter function for date range
+      filterFn: (row, columnId, filterValues) => {
+        const [min, max] = filterValues;
+        
+        // If no filter values are set, show all rows
+        if (!min && !max) return true;
+        
+        const rowDate = dayjs(row.original[columnId]);
+        
+        // Check if row date is within the selected range
+        const isAfterMin = !min || rowDate.isAfter(dayjs(min).startOf('day'));
+        const isBeforeMax = !max || rowDate.isBefore(dayjs(max).endOf('day'));
+        
+        return isAfterMin && isBeforeMax;
+      },
+      
+      // Custom date range picker configuration
+      muiFilterDatePickerProps: {
+        // Ensure proper date range validation
+        slots: {
+          // Custom validation logic
+          textField: (props) => {
+            const { inputProps, value, onChange } = props;
+            const isStartDatePicker = inputProps?.['data-testid']?.includes('start');
+            
+            // Get current filter values
+            const [startDate, endDate] = value || [null, null];
+            
+            return (
+              <DatePicker
+                {...props}
+                // Dynamic date constraints
+                minDate={isStartDatePicker 
+                  ? null  // No minimum for start date picker
+                  : startDate  // Minimum for end date picker is start date
+                }
+                maxDate={!isStartDatePicker 
+                  ? null  // No maximum for end date picker
+                  : endDate  // Maximum for start date picker is end date
+                }
+                
+                // Disable invalid dates
+                shouldDisableDate={(day) => {
+                  // If it's the start date picker
+                  if (isStartDatePicker && endDate) {
+                    // Disable dates after end date
+                    return day.isAfter(endDate);
+                  }
+                  
+                  // If it's the end date picker
+                  if (!isStartDatePicker && startDate) {
+                    // Disable dates before start date
+                    return day.isBefore(startDate);
+                  }
+                  
+                  return false;
+                }}
+                
+                // Custom onChange to handle date range logic
+                onChange={(newValue) => {
+                  if (isStartDatePicker) {
+                    // Update start date, ensuring it doesn't exceed end date
+                    onChange([
+                      newValue, 
+                      endDate && newValue > endDate ? null : endDate
+                    ]);
+                  } else {
+                    // Update end date, ensuring it's not before start date
+                    onChange([
+                      startDate, 
+                      newValue
+                    ]);
+                  }
+                }}
+              />
+            );
+          }
+        },
+        
+        // Additional configuration
+        slotProps: {
+          textField: {
+            helperText: 'Select date range',
+          }
+        }
+      }
+    }
+  ], []);
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable
+        columns={columns}
+        data={data}
+        enableColumnFilters
+        enableFilters
+        
+        // Optional: Initial filter state
+        initialState={{
+          columnFilters: [
+            {
+              id: 'date',
+              value: [null, null]
+            }
+          ]
+        }}
+      />
+    </LocalizationProvider>
+  );
+};
+
+export default DynamicDateRangeFilter;
+------------------------Response4-------------------------------
+
 import React, { useMemo, useState, useCallback } from 'react';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
