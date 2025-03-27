@@ -2,6 +2,65 @@ import React, { useMemo, useState } from "react";
 import MaterialReactTable from "material-react-table";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import dayjs from "dayjs";
+
+const YourComponent = () => {
+  const [data, setData] = useState([
+    { id: 1, date: "2023-01-01" },
+    { id: 2, date: "2023-06-15" },
+    { id: 3, date: "2024-02-20" },
+  ]);
+
+  // Track selected min/max dates
+  const [minDate, setMinDate] = useState(null);
+  const [maxDate, setMaxDate] = useState(null);
+
+  const columns = useMemo(
+    () => [
+      {
+        accessorKey: "date",
+        header: "Date",
+        filterVariant: "date-range",
+        filterFn: "between",
+
+        // Dynamically adjust min/max for Date Range Picker
+        muiFilterDatePickerProps: ({ rangePosition }) => ({
+          minDate: rangePosition === "end" ? minDate : null, // Min date for Max Picker
+          maxDate: rangePosition === "start" ? maxDate : null, // Max date for Min Picker
+          onChange: (newValue) => {
+            if (rangePosition === "start") {
+              setMinDate(newValue);
+              if (maxDate && dayjs(newValue).isAfter(maxDate)) {
+                setMaxDate(null); // Reset if invalid
+              }
+            } else if (rangePosition === "end") {
+              setMaxDate(newValue);
+              if (minDate && dayjs(newValue).isBefore(minDate)) {
+                setMinDate(null); // Reset if invalid
+              }
+            }
+          },
+        }),
+      },
+    ],
+    [minDate, maxDate]
+  );
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable columns={columns} data={data} enableColumnFilters />
+    </LocalizationProvider>
+  );
+};
+
+export default YourComponent;
+
+##№##########
+import React, { useMemo, useState } from "react";
+import MaterialReactTable from "material-react-table";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 
 const YourComponent = () => {
