@@ -1,3 +1,93 @@
+import React, { useMemo, useState } from 'react';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import MaterialReactTable from 'material-react-table';
+import dayjs from 'dayjs';
+
+const DynamicDateRangeFilter = () => {
+  const [data, setData] = useState([
+    { id: 1, date: '2023-01-01' },
+    { id: 2, date: '2023-06-15' },
+    { id: 3, date: '2024-02-20' },
+  ]);
+
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'date',
+      header: 'Date',
+      filterVariant: 'date-range',
+      
+      // Custom filter function to handle dynamic range validation
+      filterFn: (row, columnId, filterValues) => {
+        const [min, max] = filterValues;
+        
+        // If no filter values are set, show all rows
+        if (!min && !max) return true;
+        
+        const rowDate = dayjs(row.original[columnId]);
+        
+        // Check if row date is within the selected range
+        const isAfterMin = !min || rowDate.isAfter(dayjs(min).startOf('day'));
+        const isBeforeMax = !max || rowDate.isBefore(dayjs(max).endOf('day'));
+        
+        return isAfterMin && isBeforeMax;
+      },
+      
+      // Custom date picker props for dynamic validation
+      muiFilterDatePickerProps: {
+        // Dynamic min and max date logic
+        minDate: null,
+        maxDate: null,
+        
+        // Custom onChange handler to enforce date range rules
+        onChange: (value, context) => {
+          const { setFilterValue, filterValues } = context;
+          const [currentMin, currentMax] = filterValues;
+          
+          if (context.type === 'start') {
+            // If setting the start date, update min date
+            setFilterValue([value, currentMax]);
+          } else if (context.type === 'end') {
+            // If setting the end date, update max date
+            setFilterValue([currentMin, value]);
+          }
+        },
+        
+        // Custom validation function
+        shouldDisableDate: (day, context) => {
+          const [currentMin, currentMax] = context.filterValues;
+          
+          if (context.type === 'start' && currentMax) {
+            // Disable dates after the current max when setting min
+            return day.isAfter(currentMax);
+          }
+          
+          if (context.type === 'end' && currentMin) {
+            // Disable dates before the current min when setting max
+            return day.isBefore(currentMin);
+          }
+          
+          return false;
+        }
+      }
+    }
+  ], []);
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable
+        columns={columns}
+        data={data}
+        enableColumnFilters
+        enableFilters
+      />
+    </LocalizationProvider>
+  );
+};
+
+export default DynamicDateRangeFilter;
+-------------------------------------------------------------------------------------
+
 import { useState, useEffect } from "react";
 
 const useFilteredData = (data, columnFilters) => {
