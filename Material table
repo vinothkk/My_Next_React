@@ -314,3 +314,76 @@ const YourComponent = () => {
 };
 
 export default YourComponent;
+
+gpt2
+import React, { useMemo, useState } from "react";
+import MaterialReactTable from "material-react-table";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import dayjs from "dayjs";
+
+const YourComponent = () => {
+  const [data, setData] = useState([
+    { id: 1, date: "2023-01-01" },
+    { id: 2, date: "2023-06-15" },
+    { id: 3, date: "2024-02-20" },
+  ]);
+
+  // State for filter dates
+  const [minDate, setMinDate] = useState(null);
+  const [maxDate, setMaxDate] = useState(null);
+
+  // Filter logic to disable dates dynamically
+  const filteredData = useMemo(() => {
+    return data.filter((row) => {
+      const rowDate = dayjs(row.date);
+      if (minDate && rowDate.isBefore(minDate)) return false;
+      if (maxDate && rowDate.isAfter(maxDate)) return false;
+      return true;
+    });
+  }, [data, minDate, maxDate]);
+
+  const columns = useMemo(
+    () => [
+      {
+        accessorKey: "date",
+        header: "Date",
+      },
+    ],
+    []
+  );
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <div style={{ display: "flex", gap: "16px", marginBottom: "20px" }}>
+        <DatePicker
+          label="Min Date"
+          value={minDate}
+          onChange={(newValue) => {
+            setMinDate(newValue);
+            if (maxDate && dayjs(newValue).isAfter(maxDate)) {
+              setMaxDate(null); // Reset maxDate if minDate is greater
+            }
+          }}
+          disableFuture
+        />
+        <DatePicker
+          label="Max Date"
+          value={maxDate}
+          onChange={(newValue) => {
+            setMaxDate(newValue);
+            if (minDate && dayjs(newValue).isBefore(minDate)) {
+              setMinDate(null); // Reset minDate if maxDate is earlier
+            }
+          }}
+          disableFuture
+          minDate={minDate} // Enforce minDate selection
+        />
+      </div>
+      <MaterialReactTable columns={columns} data={filteredData} />
+    </LocalizationProvider>
+  );
+};
+
+export default YourComponent;
