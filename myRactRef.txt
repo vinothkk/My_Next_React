@@ -1,6 +1,102 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import MaterialReactTable from 'material-react-table';
+import dayjs from 'dayjs';
+
+const DynamicDateRangeFilter = () => {
+  const [data, setData] = useState([
+    { id: 1, date: '2023-01-01' },
+    { id: 2, date: '2023-06-15' },
+    { id: 3, date: '2024-02-20' },
+  ]);
+
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'date',
+      header: 'Date',
+      filterVariant: 'date-range',
+      
+      // Custom filter function for date range
+      filterFn: (row, columnId, filterValues) => {
+        const [min, max] = filterValues;
+        
+        // If no filter values are set, show all rows
+        if (!min && !max) return true;
+        
+        const rowDate = dayjs(row.original[columnId]);
+        
+        // Check if row date is within the selected range
+        const isAfterMin = !min || rowDate.isAfter(dayjs(min).startOf('day'));
+        const isBeforeMax = !max || rowDate.isBefore(dayjs(max).endOf('day'));
+        
+        return isAfterMin && isBeforeMax;
+      },
+      
+      // Custom date range picker configuration
+      muiFilterDatePickerProps: {
+        slots: {
+          // Custom date picker component to implement advanced validation
+          textField: (props) => {
+            const { inputProps, InputProps, ...rest } = props;
+            const isStartDatePicker = inputProps?.['data-testid']?.includes('start');
+            
+            return (
+              <DatePicker
+                {...rest}
+                inputProps={inputProps}
+                InputProps={InputProps}
+                // Dynamic min and max date constraints
+                minDate={isStartDatePicker 
+                  ? null  // No minimum for start date picker initially
+                  : props.value?.[0] || null  // Max date picker can't be before start date
+                }
+                maxDate={!isStartDatePicker 
+                  ? null  // No maximum for end date picker initially
+                  : props.value?.[1] || null  // Min date picker can't be after end date
+                }
+                // Disable dates based on the other picker's selection
+                shouldDisableDate={(day) => {
+                  const [startDate, endDate] = props.value || [];
+                  
+                  if (isStartDatePicker && endDate) {
+                    // For start date picker, disable dates after end date
+                    return day.isAfter(endDate);
+                  }
+                  
+                  if (!isStartDatePicker && startDate) {
+                    // For end date picker, disable dates before start date
+                    return day.isBefore(startDate);
+                  }
+                  
+                  return false;
+                }}
+              />
+            );
+          }
+        }
+      }
+    }
+  ], []);
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable
+        columns={columns}
+        data={data}
+        enableColumnFilters
+        enableFilters
+      />
+    </LocalizationProvider>
+  );
+};
+
+export default DynamicDateRangeFilter;
+------------------------------Cloudi-3--------------------------------------
+import React, { useMemo, useState, useCallback } from 'react';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import MaterialReactTable from 'material-react-table';
 import dayjs from 'dayjs';
 
