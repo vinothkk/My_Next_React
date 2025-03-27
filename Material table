@@ -117,3 +117,132 @@ const YourComponent = () => {
 };
 
 export default YourComponent;
+
+
+
+import React, { useMemo, useState } from 'react';
+import MaterialReactTable from 'material-react-table';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { 
+  isValid as dateIsValid, 
+  parseISO, 
+  parse, 
+  format 
+} from 'date-fns';
+
+const YourComponent = () => {
+  const [data, setData] = useState([
+    { id: 1, date: '2023-01-01' },
+    { id: 2, date: '2023-06-15' },
+    { id: 3, date: '2024-02-20' },
+  ]);
+
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'date',
+      header: 'Date',
+      filterVariant: 'date-range',
+      
+      // Custom date validation and formatting
+      Cell: ({ cell }) => {
+        const dateValue = cell.getValue();
+        // Safely format the date
+        try {
+          return dateValue 
+            ? format(parseISO(dateValue), 'PP') 
+            : '';
+        } catch {
+          return dateValue || '';
+        }
+      },
+
+      // Ensure date is processed correctly
+      accessorFn: (originalRow) => {
+        try {
+          // Convert to Date object if it's a string
+          return originalRow.date 
+            ? parseISO(originalRow.date) 
+            : null;
+        } catch {
+          return null;
+        }
+      },
+
+      // Date range filter configuration
+      muiFilterTextFieldProps: {
+        // Custom date parsing and validation
+        InputProps: {
+          inputProps: {
+            min: '2023-01-01',
+            max: '2024-12-31'
+          }
+        }
+      },
+
+      // MUI Date Picker specific props
+      muiFilterDatePickerProps: {
+        // Explicitly set date adapter
+        slots: {
+          textField: (props) => (
+            <TextField 
+              {...props}
+              error={!dateIsValid(props.value)}
+            />
+          )
+        },
+        
+        // Date range constraints
+        minDate: new Date('2023-01-01'),
+        maxDate: new Date('2024-12-31'),
+
+        // Custom date validation
+        onError: (error, value) => {
+          console.log('Date Picker Error:', error);
+        },
+
+        // Ensure proper date parsing
+        parseDate: (value) => {
+          if (!value) return null;
+          
+          // Try multiple parsing strategies
+          const parsedDate = 
+            parseISO(value) || 
+            parse(value, 'yyyy-MM-dd', new Date()) ||
+            parse(value, 'MM/dd/yyyy', new Date());
+          
+          return dateIsValid(parsedDate) ? parsedDate : null;
+        }
+      }
+    }
+  ], []);
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <MaterialReactTable
+        columns={columns}
+        data={data}
+        enableColumnFilters
+        enableFilters
+        
+        // Global date picker configuration
+        muiFilterDatePickerProps={{
+          // Consistent date adapter
+          slots: {
+            textField: (props) => (
+              <TextField 
+                {...props}
+                error={!dateIsValid(props.value)}
+              />
+            )
+          }
+        }}
+      />
+    </LocalizationProvider>
+  );
+};
+
+export default YourComponent;
+
+// Required dependencies:
+// npm install @mui/x-date-pickers date-fns @mui/material
