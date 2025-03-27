@@ -1,4 +1,83 @@
 import React, { useMemo, useState } from "react";
+import MaterialReactTable from "material-react-table";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import dayjs from "dayjs";
+import { Box } from "@mui/material";
+
+const CustomDateRangeFilter = ({ column, table }) => {
+  const [minDate, setMinDate] = useState(null);
+  const [maxDate, setMaxDate] = useState(null);
+
+  const handleMinDateChange = (date) => {
+    setMinDate(date);
+    if (maxDate && date && date.isAfter(maxDate)) {
+      setMaxDate(null);
+    }
+    table.setColumnFilters([
+      { id: column.id, value: [date, maxDate] },
+    ]);
+  };
+
+  const handleMaxDateChange = (date) => {
+    setMaxDate(date);
+    if (minDate && date && date.isBefore(minDate)) {
+      setMinDate(null);
+    }
+    table.setColumnFilters([
+      { id: column.id, value: [minDate, date] },
+    ]);
+  };
+
+  return (
+    <Box sx={{ display: "flex", gap: 1 }}>
+      <DatePicker
+        label="Min Date"
+        value={minDate}
+        onChange={handleMinDateChange}
+        maxDate={maxDate}
+      />
+      <DatePicker
+        label="Max Date"
+        value={maxDate}
+        onChange={handleMaxDateChange}
+        minDate={minDate}
+      />
+    </Box>
+  );
+};
+
+const YourComponent = () => {
+  // ... your data
+
+  const columns = useMemo(
+    () => [
+      {
+        accessorFn: (originalRow) => new Date(originalRow.closeDate),
+        accessorKey: "Close Date",
+        header: "Close Date",
+        filterComponent: CustomDateRangeFilter, // Use custom filter
+      },
+    ],
+    []
+  );
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable
+        columns={columns}
+        data={data}
+        enableColumnFilters
+      />
+    </LocalizationProvider>
+  );
+};
+
+export default YourComponent;
+__________________________________________________________________________
+_
+import React, { useMemo, useState } from "react";
 import MaterialReactTable, { filterFns } from "material-react-table";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
