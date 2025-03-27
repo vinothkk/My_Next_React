@@ -246,3 +246,71 @@ export default YourComponent;
 
 // Required dependencies:
 // npm install @mui/x-date-pickers date-fns @mui/material
+
+≠====GPT=====
+
+
+import React, { useMemo, useState } from 'react';
+import MaterialReactTable from 'material-react-table';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+
+const YourComponent = () => {
+  const [data, setData] = useState([
+    { id: 1, date: '2023-01-01' },
+    { id: 2, date: '2023-06-15' },
+    { id: 3, date: '2024-02-20' },
+  ]);
+
+  // State to manage min and max date
+  const [minDate, setMinDate] = useState(null);
+  const [maxDate, setMaxDate] = useState(null);
+
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'date',
+      header: 'Date',
+      filterVariant: 'date-range',
+      filterFn: 'between',
+
+      muiFilterDatePickerProps: ({ column }) => ({
+        minDate: minDate,
+        maxDate: maxDate,
+        onChange: (newValue) => {
+          if (column.id === 'minDate') {
+            setMinDate(newValue);
+            // Ensure maxDate is not earlier than minDate
+            if (maxDate && dayjs(newValue).isAfter(maxDate)) {
+              setMaxDate(null);
+            }
+          } else if (column.id === 'maxDate') {
+            setMaxDate(newValue);
+            // Ensure minDate is not later than maxDate
+            if (minDate && dayjs(newValue).isBefore(minDate)) {
+              setMinDate(null);
+            }
+          }
+        },
+      }),
+    }
+  ], [minDate, maxDate]);
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable
+        columns={columns}
+        data={data}
+        enableColumnFilters
+        enableFilters
+        muiFilterDatePickerProps={{
+          minDate: minDate,
+          maxDate: maxDate,
+        }}
+      />
+    </LocalizationProvider>
+  );
+};
+
+export default YourComponent;
