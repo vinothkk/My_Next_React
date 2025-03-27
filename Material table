@@ -1,3 +1,63 @@
+import React, { useMemo, useState } from "react";
+import MaterialReactTable from "material-react-table";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
+
+const YourComponent = () => {
+  const [data, setData] = useState([
+    { id: 1, date: "2023-01-01" },
+    { id: 2, date: "2023-06-15" },
+    { id: 3, date: "2024-02-20" },
+  ]);
+
+  // State for Min & Max Date filters
+  const [minDate, setMinDate] = useState(null);
+  const [maxDate, setMaxDate] = useState(null);
+
+  const columns = useMemo(
+    () => [
+      {
+        accessorKey: "date",
+        header: "Date",
+        filterVariant: "date-range", // Use MRT's built-in Date Range filter
+        filterFn: "between", // Ensures filtering is handled automatically
+
+        muiFilterDatePickerProps: {
+          minDate: minDate, // Disable dates before selected Min Date
+          maxDate: maxDate, // Disable dates after selected Max Date
+          onChange: (newValue, context) => {
+            if (context.rangePosition === "start") {
+              setMinDate(newValue);
+              // Ensure maxDate is after minDate
+              if (maxDate && dayjs(newValue).isAfter(maxDate)) {
+                setMaxDate(null);
+              }
+            } else if (context.rangePosition === "end") {
+              setMaxDate(newValue);
+              // Ensure minDate is before maxDate
+              if (minDate && dayjs(newValue).isBefore(minDate)) {
+                setMinDate(null);
+              }
+            }
+          },
+        },
+      },
+    ],
+    [minDate, maxDate]
+  );
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable columns={columns} data={data} enableColumnFilters />
+    </LocalizationProvider>
+  );
+};
+
+export default YourComponent;
+
+______&&________&
+
 import React, { useMemo, useState } from 'react';
 import MaterialReactTable, { 
   type MRT_ColumnDef,
