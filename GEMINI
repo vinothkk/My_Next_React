@@ -1,3 +1,99 @@
+
+import React, { useMemo, useState } from "react";
+import MaterialReactTable from "material-react-table";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import dayjs from "dayjs";
+import { Box, Popover } from "@mui/material";
+
+const CustomDateRangeFilter = ({ column, table, anchorEl, onClose }) => {
+  const [minDate, setMinDate] = useState(null);
+  const [maxDate, setMaxDate] = useState(null);
+
+  const handleMinDateChange = (date) => {
+    setMinDate(date);
+    if (maxDate && date && date.isAfter(maxDate)) {
+      setMaxDate(null);
+    }
+    table.setColumnFilters([{ id: column.id, value: [date, maxDate] }]);
+  };
+
+  const handleMaxDateChange = (date) => {
+    setMaxDate(date);
+    if (minDate && date && date.isBefore(minDate)) {
+      setMinDate(null);
+    }
+    table.setColumnFilters([{ id: column.id, value: [minDate, date] }]);
+  };
+
+  return (
+    <Popover
+      open={Boolean(anchorEl)}
+      anchorEl={anchorEl}
+      onClose={onClose}
+      anchorOrigin={{
+        vertical: "bottom",
+        horizontal: "left",
+      }}
+      transformOrigin={{
+        vertical: "top",
+        horizontal: "left",
+      }}
+    >
+      <Box sx={{ p: 2, display: "flex", gap: 1 }}>
+        <DatePicker
+          label="Min Date"
+          value={minDate}
+          onChange={handleMinDateChange}
+          maxDate={maxDate}
+        />
+        <DatePicker
+          label="Max Date"
+          value={maxDate}
+          onChange={handleMaxDateChange}
+          minDate={minDate}
+        />
+      </Box>
+    </Popover>
+  );
+};
+
+const YourComponent = () => {
+  // ... your data
+
+  const columns = useMemo(
+    () => [
+      {
+        accessorFn: (originalRow) => new Date(originalRow.closeDate),
+        accessorKey: "Close Date",
+        header: "Close Date",
+        muiTableHeadCellFilterTextFieldProps: ({ column, table, anchorEl, onClose }) => ({
+          children: (
+            <CustomDateRangeFilter
+              column={column}
+              table={table}
+              anchorEl={anchorEl}
+              onClose={onClose}
+            />
+          ),
+        }),
+      },
+    ],
+    []
+  );
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable columns={columns} data={data} enableColumnFilters />
+    </LocalizationProvider>
+  );
+};
+
+export default YourComponent;
+==============================================================================================
+
+
 import React, { useMemo, useState } from "react";
 import MaterialReactTable from "material-react-table";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
