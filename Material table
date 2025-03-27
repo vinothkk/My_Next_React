@@ -2,6 +2,78 @@ import React, { useMemo, useState } from "react";
 import MaterialReactTable from "material-react-table";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
+
+const YourComponent = () => {
+  const [data] = useState([
+    { id: 1, date: "2023-01-01" },
+    { id: 2, date: "2023-06-15" },
+    { id: 3, date: "2024-02-20" },
+  ]);
+
+  // Track selected minDate and maxDate
+  const [minDate, setMinDate] = useState(null);
+  const [maxDate, setMaxDate] = useState(null);
+
+  // Configure columns with date picker functionality
+  const columns = useMemo(
+    () => [
+      {
+        accessorKey: "date", // Column accessor
+        header: "Date",
+        filterVariant: "date-range", // Enable date-range filtering
+        filterFn: "between", // Use "between" filter function for the date range
+
+        // Dynamically update minDate and maxDate in the date picker
+        muiFilterDatePickerProps: ({ rangePosition }) => ({
+          minDate:
+            rangePosition === "end" && minDate // For max date picker, apply minDate
+              ? dayjs(minDate)
+              : null,
+          maxDate:
+            rangePosition === "start" && maxDate // For min date picker, apply maxDate
+              ? dayjs(maxDate)
+              : null,
+          onChange: (newValue) => {
+            if (rangePosition === "start") {
+              // Handle minDate changes
+              if (maxDate && dayjs(newValue).isAfter(maxDate)) {
+                setMaxDate(null); // Reset maxDate if invalid
+              }
+              setMinDate(newValue); // Update minDate
+            } else if (rangePosition === "end") {
+              // Handle maxDate changes
+              if (minDate && dayjs(newValue).isBefore(minDate)) {
+                setMinDate(null); // Reset minDate if invalid
+              }
+              setMaxDate(newValue); // Update maxDate
+            }
+          },
+        }),
+      },
+    ],
+    [minDate, maxDate] // Re-run memoized logic whenever minDate or maxDate changes
+  );
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable
+        columns={columns}
+        data={data}
+        enableColumnFilters // Enable filtering on the column
+      />
+    </LocalizationProvider>
+  );
+};
+
+export default YourComponent;
+
+co pilo 
+
+import React, { useMemo, useState } from "react";
+import MaterialReactTable from "material-react-table";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs from "dayjs";
 
