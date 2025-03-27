@@ -1,3 +1,99 @@
+import React, { useMemo, useState, useCallback } from 'react';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import MaterialReactTable from 'material-react-table';
+import dayjs from 'dayjs';
+
+const DynamicDateRangeFilter = () => {
+  const [data, setData] = useState([
+    { id: 1, date: '2023-01-01' },
+    { id: 2, date: '2023-06-15' },
+    { id: 3, date: '2024-02-20' },
+  ]);
+
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'date',
+      header: 'Date',
+      filterVariant: 'date-range',
+      
+      // Custom filter function to handle dynamic range validation
+      filterFn: (row, columnId, filterValues) => {
+        const [min, max] = filterValues;
+        
+        // If no filter values are set, show all rows
+        if (!min && !max) return true;
+        
+        const rowDate = dayjs(row.original[columnId]);
+        
+        // Check if row date is within the selected range
+        const isAfterMin = !min || rowDate.isAfter(dayjs(min).startOf('day'));
+        const isBeforeMax = !max || rowDate.isBefore(dayjs(max).endOf('day'));
+        
+        return isAfterMin && isBeforeMax;
+      },
+      
+      // Modify column definition to include custom props
+      muiFilterDatePickerProps: {
+        // Add props that don't rely on undefined context
+        minDate: null,
+        maxDate: null,
+        
+        // Remove context-dependent methods
+        // Instead, handle date constraints in the table configuration
+      }
+    }
+  ], []);
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable
+        columns={columns}
+        data={data}
+        enableColumnFilters
+        enableFilters
+        
+        // Move dynamic date range logic to table-level configuration
+        onColumnFilterChange={(updatedColumnFilters) => {
+          // Find the date column filter
+          const dateFilter = updatedColumnFilters.find(
+            filter => filter.id === 'date'
+          );
+
+          // If date filter exists, perform custom validation
+          if (dateFilter && dateFilter.value) {
+            const [minDate, maxDate] = dateFilter.value;
+            
+            // Custom validation logic
+            if (minDate && maxDate) {
+              const parsedMin = dayjs(minDate);
+              const parsedMax = dayjs(maxDate);
+              
+              // Ensure min date is not after max date
+              if (parsedMin.isAfter(parsedMax)) {
+                // Optionally, you can show an error or reset the filter
+                console.warn('Minimum date cannot be after maximum date');
+                // You might want to reset the filter or show a toast/notification
+              }
+            }
+          }
+        }}
+        
+        // Optional: Custom date range filter props
+        muiFilterDatePickerProps={{
+          // Global date range constraints if needed
+          minDate: dayjs('2023-01-01'),
+          maxDate: dayjs('2024-12-31'),
+        }}
+      />
+    </LocalizationProvider>
+  );
+};
+
+export default DynamicDateRangeFilter;
+-------------------------above is second----------------------------
+
+
 import React, { useMemo, useState } from 'react';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
