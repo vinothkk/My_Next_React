@@ -1,4 +1,165 @@
+Cloudi
+=======================
+import React, { useMemo, useState, useCallback } from 'react';
+import MaterialReactTable, { 
+  MRT_ColumnDef, 
+  MRT_ColumnFilterProps 
+} from 'material-react-table';
+import { 
+  LocalizationProvider, 
+  DatePicker 
+} from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { Box } from '@mui/material';
+import dayjs, { Dayjs } from 'dayjs';
 
+// Custom Date Range Filter Component
+const CustomDateRangeFilter = ({ 
+  column, 
+  table 
+}: MRT_ColumnFilterProps<any>) => {
+  const [minDate, setMinDate] = useState<Dayjs | null>(null);
+  const [maxDate, setMaxDate] = useState<Dayjs | null>(null);
+
+  const handleMinDateChange = (date: Dayjs | null) => {
+    setMinDate(date);
+    
+    // Reset max date if it's now invalid
+    const updatedMaxDate = (maxDate && date && maxDate.isBefore(date)) 
+      ? null 
+      : maxDate;
+    
+    setMaxDate(updatedMaxDate);
+
+    // Update column filters
+    table.setColumnFilters(
+      date || updatedMaxDate 
+        ? [{ 
+            id: column.id, 
+            value: [date, updatedMaxDate] 
+          }] 
+        : []
+    );
+  };
+
+  const handleMaxDateChange = (date: Dayjs | null) => {
+    setMaxDate(date);
+    
+    // Reset min date if it's now invalid
+    const updatedMinDate = (minDate && date && minDate.isAfter(date)) 
+      ? null 
+      : minDate;
+    
+    setMinDate(updatedMinDate);
+
+    // Update column filters
+    table.setColumnFilters(
+      date || updatedMinDate 
+        ? [{ 
+            id: column.id, 
+            value: [updatedMinDate, date] 
+          }] 
+        : []
+    );
+  };
+
+  // Custom function to disable dates
+  const shouldDisableMinDate = useCallback((day: Dayjs) => {
+    // If max date is set, disable dates after max date
+    return maxDate ? day.isAfter(maxDate) : false;
+  }, [maxDate]);
+
+  const shouldDisableMaxDate = useCallback((day: Dayjs) => {
+    // If min date is set, disable dates before min date
+    return minDate ? day.isBefore(minDate) : false;
+  }, [minDate]);
+
+  return (
+    <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
+      <DatePicker
+        label="Min Date"
+        value={minDate}
+        onChange={handleMinDateChange}
+        maxDate={maxDate}
+        shouldDisableDate={shouldDisableMinDate}
+        slotProps={{
+          textField: { 
+            variant: 'standard',
+            fullWidth: true 
+          }
+        }}
+      />
+      <DatePicker
+        label="Max Date"
+        value={maxDate}
+        onChange={handleMaxDateChange}
+        minDate={minDate}
+        shouldDisableDate={shouldDisableMaxDate}
+        slotProps={{
+          textField: { 
+            variant: 'standard',
+            fullWidth: true 
+          }
+        }}
+      />
+    </Box>
+  );
+};
+
+// Main Component
+const DateRangeFilterTable = () => {
+  // Sample data - replace with your actual data
+  const [data, setData] = useState([
+    { id: 1, date: '2023-01-01' },
+    { id: 2, date: '2023-06-15' },
+    { id: 3, date: '2024-02-20' },
+    { id: 4, date: '2024-03-15' },
+    { id: 5, date: '2024-07-10' },
+  ]);
+
+  const columns = useMemo<MRT_ColumnDef<any>[]>(() => [
+    {
+      accessorKey: 'date',
+      header: 'Date',
+      filterVariant: 'custom',
+      filterComponent: CustomDateRangeFilter,
+      
+      // Custom filter function for date range
+      filterFn: (row, columnId, filterValues) => {
+        const [minDate, maxDate] = filterValues || [];
+        
+        // If no filter values are set, show all rows
+        if (!minDate && !maxDate) return true;
+        
+        const rowDate = dayjs(row.original[columnId]);
+        
+        // Check if row date is within the selected range
+        const isAfterMin = !minDate || rowDate.isAfter(dayjs(minDate).startOf('day'));
+        const isBeforeMax = !maxDate || rowDate.isBefore(dayjs(maxDate).endOf('day'));
+        
+        return isAfterMin && isBeforeMax;
+      },
+    },
+    // Add more columns as needed
+  ], []);
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <MaterialReactTable
+        columns={columns}
+        data={data}
+        enableColumnFilters
+        enableFiltering
+        initialState={{ 
+          showColumnFilters: true 
+        }}
+      />
+    </LocalizationProvider>
+  );
+};
+
+export default DateRangeFilterTable;
+=======================
 import React, { useMemo, useState } from "react";
 import MaterialReactTable from "material-react-table";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
