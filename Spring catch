@@ -1,0 +1,84 @@
+To set a time period for the cache expiration, you need to use Caffeine because spring-boot-starter-cache alone does not provide built-in support for cache expiration.
+
+Which one to use?
+
+You need both dependencies:
+
+1. spring-boot-starter-cache (Provides Spring's caching abstraction)
+
+
+2. Caffeine dependency (Provides an actual cache implementation with time-based expiration)
+
+
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-cache</artifactId>
+</dependency>
+
+<dependency>
+    <groupId>com.github.ben-manes.caffeine</groupId>
+    <artifactId>caffeine</artifactId>
+</dependency>
+
+
+---
+
+How to Set Expiration Time for the Cache?
+
+After adding the Caffeine dependency, configure the cache expiration in application.properties:
+
+spring.cache.type=caffeine
+spring.cache.caffeine.spec=maximumSize=1000,expireAfterWrite=10m
+
+OR define it in a configuration class:
+
+@Configuration
+@EnableCaching
+public class CacheConfig {
+    @Bean
+    public CacheManager cacheManager() {
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager("myCache");
+        cacheManager.setCaffeine(Caffeine.newBuilder()
+                .expireAfterWrite(10, TimeUnit.MINUTES) // Cache expires 10 minutes after write
+                .maximumSize(1000)); // Max 1000 entries in cache
+        return cacheManager;
+    }
+}
+
+
+---
+
+How Does Cache Expiration Work?
+
+Does each request reset the expiration time?
+
+If you use expireAfterWrite(10m):
+
+The cache entry expires 10 minutes after it was written, regardless of how many times it is accessed.
+
+Each key has its own independent expiration timer.
+
+
+If you use expireAfterAccess(10m):
+
+The cache entry resets the expiration time on each access.
+
+If a request accesses a cached entry, the 10-minute timer resets, meaning the data stays longer if frequently used.
+
+
+
+
+---
+
+Example Behavior
+
+Which one to use?
+
+Use expireAfterWrite if you want the data to be refreshed periodically.
+
+Use expireAfterAccess if you want to extend the cache lifespan when it is frequently accessed.
+
+
+Would you like help testing this in your Spring Boot application?
+
