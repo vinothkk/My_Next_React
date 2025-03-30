@@ -1,4 +1,58 @@
 const data = [
+  { createdDate: "2/21/2025 10:31 AM", ageInDay: 37 },
+  { createdDate: "2/22/2025 10:31 AM", ageInDay: 80 },
+  { createdDate: "2/24/2025 10:31 AM", ageInDay: 85 },
+  { createdDate: "3/12/2025 10:44 PM", ageInDay: 85 },
+];
+
+// Get current date
+const currentDate = new Date();
+
+const filteredData = data.filter(item => {
+  try {
+    // Split the date string into components
+    const [datePart, timePart, ampm] = item.createdDate.split(" ");
+    
+    // Split date part
+    const [month, day, year] = datePart.split("/").map(num => parseInt(num, 10));
+    
+    // Split time part
+    const [hours, minutes] = timePart.split(":").map(num => parseInt(num, 10));
+    
+    // Adjust hours for AM/PM
+    let adjustedHours = hours;
+    if (ampm === "PM" && hours < 12) {
+      adjustedHours += 12;
+    } else if (ampm === "AM" && hours === 12) {
+      adjustedHours = 0;
+    }
+    
+    // Check if date is valid
+    const isValidDate = (y, m, d) => {
+      const date = new Date(y, m - 1, d); // Adjust month (JS months are 0-indexed)
+      return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+    };
+    
+    if (!isValidDate(year, month, day)) {
+      console.log(`Skipping invalid date: ${item.createdDate}`);
+      return false;
+    }
+    
+    // Create valid date object
+    const itemDate = new Date(year, month - 1, day, adjustedHours, minutes);
+    console.log(`Valid date: ${itemDate.toString()} from ${item.createdDate}`);
+    
+    // Compare with current date
+    return itemDate < currentDate;
+  } catch (e) {
+    console.log(`Error parsing date: ${item.createdDate} - ${e.message}`);
+    return false;
+  }
+});
+
+console.log(filteredData);
+
+const data = [
   { createdDate: "2/21/2025 10:31AM", ageInDay: 37 },
   { createdDate: "2/22/2025 10:31AM", ageInDay: 80 },
   { createdDate: "2/24/2025 10:31AM", ageInDay: 85 },
