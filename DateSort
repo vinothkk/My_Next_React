@@ -1,3 +1,33 @@
+function filterResponseData(responseData, filterCriteria) {
+  return responseData.filter(item => {
+    let matchesPriority = true;
+    let matchesRisk = true;
+
+    for (const criterion of filterCriteria) {
+      if (criterion.id === 'inquiryPriority') {
+        matchesPriority = criterion.value.includes(item.inquiryPriority);
+      } else if (criterion.id === 'risk') {
+        const riskValue = criterion.value[0];
+        let itemRisk;
+
+        if (typeof riskValue === 'boolean') {
+          itemRisk = item.detailData.risk === 'Yes'; // Convert 'Yes' to true and 'No' to false
+          matchesRisk = riskValue === itemRisk;
+        } else {
+            matchesRisk = true; // if risk is not boolean, skip the risk check.
+        }
+      }
+    }
+
+    return matchesPriority && matchesRisk;
+  });
+}
+
+const filteredData = filterResponseData(responseData, filterCriteria);
+console.log(filteredData);
+
+===========================================================================================================
+
 const data = [
   { createdDate: "2/21/2025 10:31 AM", ageInDay: 37 },
   { createdDate: "2/22/2025 10:31 AM", ageInDay: 80 },
