@@ -1,0 +1,51 @@
+const data = [
+  { createdDate: "2/21/2025 10:31AM", ageInDay: 37 },
+  { createdDate: "2/22/2025 10:31AM", ageInDay: 80 },
+  { createdDate: "2/24/2025 10:31AM", ageInDay: 85 },
+  { createdDate: "2/30/2025 10:31AM", ageInDay: 85 }, // Invalid date
+];
+
+// Get current date
+const currentDate = new Date();
+
+const filteredData = data.filter(item => {
+  // Parse date parts manually
+  const parts = item.createdDate.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)(AM|PM)/);
+  
+  if (!parts) {
+    console.log(`Invalid date format: ${item.createdDate}`);
+    return false;
+  }
+  
+  let [_, month, day, year, hours, minutes, ampm] = parts;
+  
+  month = parseInt(month, 10) - 1; // JS months are 0-indexed
+  day = parseInt(day, 10);
+  year = parseInt(year, 10);
+  hours = parseInt(hours, 10);
+  minutes = parseInt(minutes, 10);
+  
+  // Convert 12-hour to 24-hour
+  if (ampm === 'PM' && hours < 12) hours += 12;
+  if (ampm === 'AM' && hours === 12) hours = 0;
+  
+  // Check for valid month and day
+  if (month < 0 || month > 11) {
+    console.log(`Invalid month in date: ${item.createdDate}`);
+    return false;
+  }
+  
+  // Create a date object and verify it's valid by checking the day
+  const itemDate = new Date(year, month, day, hours, minutes);
+  
+  // Check if the day is valid (if we set day=30 in February, JS rolls to March)
+  if (itemDate.getDate() !== day) {
+    console.log(`Invalid day in date: ${item.createdDate}`);
+    return false;
+  }
+  
+  console.log(`Valid date parsed: ${itemDate} from ${item.createdDate}`);
+  return itemDate < currentDate;
+});
+
+console.log(filteredData);
