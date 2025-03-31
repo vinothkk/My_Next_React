@@ -1,3 +1,37 @@
+
+
+function filterResponseData(responseData, filterCriteria) {
+  return responseData.filter(item => {
+    let matchesPriority = true;
+    let matchesRisk = true;
+
+    for (const criterion of filterCriteria) {
+      if (criterion.id === 'inquiryPriority') {
+        matchesPriority = criterion.value.includes(item.inquiryPriority);
+      } else if (criterion.id === 'risk') {
+        const riskValue = criterion.value[0];
+        let itemRisk;
+
+        if (typeof riskValue === 'boolean') {
+          itemRisk = item.detailData.risk === 'Yes';
+          matchesRisk = riskValue === itemRisk;
+        }
+      }
+    }
+
+    // if filterCriteria only contain risk, matchesPriority should be true.
+    if (!filterCriteria.some(criterion => criterion.id === 'inquiryPriority')){
+        matchesPriority = true;
+    }
+
+    return matchesPriority && matchesRisk;
+  });
+}
+
+
+=============================
+
+
 function filterResponseData(responseData, filterCriteria) {
   return responseData.filter(item => {
     let matchesPriority = true;
