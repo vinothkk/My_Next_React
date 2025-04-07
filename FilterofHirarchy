@@ -1,3 +1,98 @@
+// Custom hook for advanced filtering
+const useNestedDataFilter = (initialData, searchFields = ['name']) => {
+  const [data, setData] = useState(initialData);
+  const [filteredData, setFilteredData] = useState(initialData);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    setData(initialData);
+    if (searchTerm) {
+      filterData(searchTerm, initialData);
+    } else {
+      setFilteredData(initialData);
+    }
+  }, [initialData]);
+
+  const filterData = (term, dataToFilter) => {
+    if (!term) {
+      setFilteredData(dataToFilter);
+      return;
+    }
+
+    const termLower = term.toLowerCase();
+    
+    // Deep clone the data
+    const result = JSON.parse(JSON.stringify(dataToFilter));
+    
+    // This function checks if an item or any of its descendants match the search term
+    const itemMatches = (item) => {
+      // Check if current item matches
+      const directMatch = searchFields.some(field => 
+        item[field] && item[field].toString().toLowerCase().includes(termLower)
+      );
+      
+      if (directMatch) return true;
+      
+      // Check if any subRows match
+      if (item.subRow && Array.isArray(item.subRow)) {
+        return item.subRow.some(subItem => itemMatches(subItem));
+      }
+      
+      return false;
+    };
+    
+    // This function creates a filtered copy of the data structure
+    const createFilteredStructure = (items) => {
+      if (!items || !Array.isArray(items)) return [];
+      
+      return items.filter(item => {
+        // Keep this item if it or any descendants match
+        const shouldKeep = itemMatches(item);
+        
+        // If keeping, create a filtered version of subRows
+        if (shouldKeep && item.subRow && Array.isArray(item.subRow)) {
+          // Process each subRow item
+          const filteredSubRows = item.subRow.map(subItem => {
+            // Check if this subItem or any of its descendants match
+            const subItemMatches = itemMatches(subItem);
+            
+            if (subItemMatches) {
+              // Create a copy with potentially filtered subRows
+              const subItemCopy = {...subItem};
+              
+              // If this subItem has its own subRows, filter them too
+              if (subItemCopy.subRow && Array.isArray(subItemCopy.subRow)) {
+                subItemCopy.subRow = subItemCopy.subRow.filter(grandchild => 
+                  itemMatches(grandchild)
+                );
+              }
+              
+              return subItemCopy;
+            }
+            
+            return null;
+          }).filter(Boolean); // Remove nulls
+          
+          // Update the item's subRows
+          item.subRow = filteredSubRows;
+        }
+        
+        return shouldKeep;
+      });
+    };
+    
+    setFilteredData(createFilteredStructure(result));
+  };
+
+  const handleSearch = (term) => {
+    setSearchTerm(term);
+    filterData(term, data);
+  };
+
+  return { filteredData, handleSearch, searchTerm };
+};
+======================++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 const filterNestedData = (items) => {
   if (!items) return [];
   
