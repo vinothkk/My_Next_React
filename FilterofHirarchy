@@ -1,3 +1,51 @@
+const filterNestedData = (items) => {
+  if (!items) return [];
+  
+  return items.filter(item => {
+    // Check if this item matches
+    const matchesCurrentItem = searchFields.some(field => 
+      item[field] && item[field].toString().toLowerCase().includes(termLower)
+    );
+    
+    // Initialize filtered subRows
+    let filteredSubRows = [];
+    
+    // Process subRows if they exist
+    if (item.subRow && Array.isArray(item.subRow)) {
+      filteredSubRows = item.subRow.filter(subItem => {
+        // Check if this subItem matches
+        const matchesSubItem = searchFields.some(field => 
+          subItem[field] && subItem[field].toString().toLowerCase().includes(termLower)
+        );
+        
+        // Initialize filtered grandchildren
+        let filteredGrandchildren = [];
+        
+        // Process grandchildren if they exist
+        if (subItem.subRow && Array.isArray(subItem.subRow)) {
+          filteredGrandchildren = subItem.subRow.filter(grandchild => 
+            searchFields.some(field => 
+              grandchild[field] && grandchild[field].toString().toLowerCase().includes(termLower)
+            )
+          );
+          
+          // Update subItem's subRow with filtered grandchildren
+          subItem.subRow = filteredGrandchildren;
+        }
+        
+        // Keep this subItem if it matches OR has matching grandchildren
+        return matchesSubItem || filteredGrandchildren.length > 0;
+      });
+      
+      // Update item's subRow with filtered subItems
+      item.subRow = filteredSubRows;
+    }
+    
+    // Keep this item if it matches OR has matching subItems
+    return matchesCurrentItem || filteredSubRows.length > 0;
+  });
+};
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Deep clone to avoid mutating original data
 const result = JSON.parse(JSON.stringify(dataToFilter));
 
