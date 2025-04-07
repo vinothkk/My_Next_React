@@ -1,3 +1,73 @@
+// Deep clone to avoid mutating original data
+const result = JSON.parse(JSON.stringify(dataToFilter));
+
+// Improved filter function that recursively searches all levels
+const filterNestedData = (items) => {
+  if (!items) return [];
+  
+  return items.filter(item => {
+    let keepItem = false;
+    
+    // Check if current item matches search term
+    const matchesCurrentItem = searchFields.some(field => 
+      item[field] && item[field].toString().toLowerCase().includes(termLower)
+    );
+    
+    if (matchesCurrentItem) {
+      keepItem = true;
+    }
+    
+    // Process first level subRows
+    if (item.subRow && Array.isArray(item.subRow)) {
+      // Check if any direct child matches
+      const hasMatchingChild = item.subRow.some(subItem => 
+        searchFields.some(field => 
+          subItem[field] && subItem[field].toString().toLowerCase().includes(termLower)
+        )
+      );
+      
+      // Process second level subRows
+      item.subRow = item.subRow.map(subItem => {
+        // Check if this subItem has its own subRows
+        if (subItem.subRow && Array.isArray(subItem.subRow)) {
+          // Filter the grandchildren
+          const filteredGrandchildren = subItem.subRow.filter(grandchild => 
+            searchFields.some(field => 
+              grandchild[field] && grandchild[field].toString().toLowerCase().includes(termLower)
+            )
+          );
+          
+          // If any grandchildren match, keep them and mark parent to be kept
+          if (filteredGrandchildren.length > 0) {
+            subItem.subRow = filteredGrandchildren;
+            return subItem; // Keep this subItem with filtered grandchildren
+          }
+        }
+        
+        // Keep subItem if it matches the search term
+        if (searchFields.some(field => 
+          subItem[field] && subItem[field].toString().toLowerCase().includes(termLower)
+        )) {
+          return subItem;
+        }
+        
+        return null; // Filter out non-matching subItems
+      }).filter(Boolean); // Remove null entries
+      
+      // Keep parent if any children match
+      if (item.subRow.length > 0 || hasMatchingChild) {
+        keepItem = true;
+      }
+    }
+    
+    return keepItem;
+  });
+};
+
+setFilteredData(filterNestedData(result));
+
+===============================================================================================================
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { MaterialReactTable } from 'material-react-table';
 
