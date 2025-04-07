@@ -1,0 +1,152 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { MaterialReactTable } from 'material-react-table';
+
+// Custom hook for advanced filtering
+const useNestedDataFilter = (initialData, searchFields = ['name']) => {
+  const [data, setData] = useState(initialData);
+  const [filteredData, setFilteredData] = useState(initialData);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Update source data if it changes externally
+  useEffect(() => {
+    setData(initialData);
+    // Apply existing filter to new data
+    if (searchTerm) {
+      filterData(searchTerm, initialData);
+    } else {
+      setFilteredData(initialData);
+    }
+  }, [initialData]);
+
+  // Memoized filtering function for better performance
+  const filterData = useMemo(() => (term, dataToFilter) => {
+    if (!term) {
+      setFilteredData(dataToFilter);
+      return;
+    }
+
+    const termLower = term.toLowerCase();
+    
+    // Deep clone to avoid mutating original data
+    const result = JSON.parse(JSON.stringify(dataToFilter));
+    
+    // Filter function that preserves parent-child structure
+    const filterNestedData = (items) => {
+      if (!items) return [];
+      
+      return items.filter(item => {
+        // Check if this item matches any search field
+        const matchesCurrentItem = searchFields.some(field => 
+          item[field] && item[field].toString().toLowerCase().includes(termLower)
+        );
+        
+        // Handle first level of subRows
+        if (item.subRow && Array.isArray(item.subRow)) {
+          item.subRow = filterNestedData(item.subRow);
+        }
+        
+        // Keep this item if it matches OR if any children match
+        return matchesCurrentItem || (item.subRow && item.subRow.length > 0);
+      });
+    };
+    
+    setFilteredData(filterNestedData(result));
+  }, [searchFields]);
+
+  // Function to handle search term changes
+  const handleSearch = (term) => {
+    setSearchTerm(term);
+    filterData(term, data);
+  };
+
+  return { filteredData, handleSearch, searchTerm };
+};
+
+// Main component
+const DataTable = ({ apiData }) => {
+  const [responseData, setResponseData] = useState(apiData?.responseBody || []);
+  
+  // Update data if API response changes
+  useEffect(() => {
+    if (apiData?.responseBody) {
+      setResponseData(apiData.responseBody);
+    }
+  }, [apiData]);
+
+  // Columns definition
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'id',
+      header: 'ID',
+    },
+    {
+      accessorKey: 'name',
+      header: 'Name',
+    },
+    {
+      accessorKey: 'type',
+      header: 'Type',
+    },
+    {
+      accessorKey: 'regin',
+      header: 'Region',
+    }
+  ], []);
+
+  // Initialize our custom filter hook with the fields we want to search
+  // Can easily add more fields in the future
+  const { filteredData, handleSearch } = useNestedDataFilter(responseData, ['name']);
+
+  // Function to extract all data (including nested) as a flat array for Material React Table
+  const getExpandedData = (data) => {
+    let flatData = [];
+    
+    data.forEach(item => {
+      // Add parent item
+      flatData.push(item);
+      
+      // Process first level children
+      if (item.subRow && Array.isArray(item.subRow)) {
+        item.subRow.forEach(child => {
+          // Add child item with reference to parent
+          const childItem = { ...child, parentReference: item.id };
+          flatData.push(childItem);
+          
+          // Process second level children
+          if (child.subRow && Array.isArray(child.subRow)) {
+            child.subRow.forEach(grandchild => {
+              // Add grandchild item with references to parent and grandparent
+              const grandchildItem = { 
+                ...grandchild, 
+                parentReference: child.id,
+                grandparentReference: item.id 
+              };
+              flatData.push(grandchildItem);
+            });
+          }
+        });
+      }
+    });
+    
+    return flatData;
+  };
+
+  // Get flattened data for the table - memoized for performance
+  const tableData = useMemo(() => getExpandedData(filteredData), [filteredData]);
+
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={tableData}
+      enableFilters={true}
+      initialState={{ showGlobalFilter: true }}
+      onGlobalFilterChange={handleSearch}
+      muiSearchTextFieldProps={{
+        placeholder: 'Search all records...',
+        variant: 'outlined',
+      }}
+    />
+  );
+};
+
+export default DataTable;
