@@ -1,0 +1,118 @@
+// Custom hook for advanced filtering with performance optimization
+const useNestedDataFilter = (initialData, searchFields = ['name']) => {
+  const [data, setData] = useState(initialData);
+  const [filteredData, setFilteredData] = useState(initialData);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Memoize filtering results to avoid redundant calculations
+  const filterData = useCallback((term, dataToFilter) => {
+    if (!term) {
+      setFilteredData(dataToFilter);
+      return;
+    }
+    
+    const termLower = term.toLowerCase();
+    
+    // Create a memoization cache for recursive checks
+    const matchCache = new Map();
+    
+    // Check if an item or its descendants match (with memoization)
+    const itemOrDescendantsMatch = (item) => {
+      // Use cached result if available
+      const itemId = item.id || JSON.stringify(item); // Use ID if available, otherwise stringify
+      if (matchCache.has(itemId)) {
+        return matchCache.get(itemId);
+      }
+      
+      // Check if current item has a direct match
+      const directMatch = searchFields.some(field => 
+        item[field] && item[field].toString().toLowerCase().includes(termLower)
+      );
+      
+      if (directMatch) {
+        matchCache.set(itemId, true);
+        return true;
+      }
+      
+      // Check descendants
+      let descendantsMatch = false;
+      if (item.subRows && Array.isArray(item.subRows)) {
+        descendantsMatch = item.subRows.some(subItem => itemOrDescendantsMatch(subItem));
+      }
+      
+      // Cache and return result
+      matchCache.set(itemId, descendantsMatch);
+      return descendantsMatch;
+    };
+    
+    // Optimize for large datasets by avoiding deep cloning
+    const filterStructureEfficiently = (items) => {
+      if (!items || !Array.isArray(items)) return [];
+      
+      const result = [];
+      
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        // Check if this item or its descendants match
+        if (itemOrDescendantsMatch(item)) {
+          // Create a shallow copy
+          const filteredItem = { ...item };
+          
+          // If it has subRows, filter them
+          if (item.subRows && Array.isArray(item.subRows)) {
+            // Only process subRows if needed
+            const filteredSubRows = [];
+            
+            for (let j = 0; j < item.subRows.length; j++) {
+              const subItem = item.subRows[j];
+              if (itemOrDescendantsMatch(subItem)) {
+                const filteredSubItem = { ...subItem };
+                
+                // Process deeper levels if needed
+                if (subItem.subRows && Array.isArray(subItem.subRows)) {
+                  filteredSubItem.subRows = filterStructureEfficiently(subItem.subRows);
+                }
+                
+                filteredSubRows.push(filteredSubItem);
+              }
+            }
+            
+            filteredItem.subRows = filteredSubRows;
+          }
+          
+          result.push(filteredItem);
+        }
+      }
+      
+      return result;
+    };
+    
+    // Use more efficient approach - avoid JSON.parse(JSON.stringify()) for large datasets
+    setFilteredData(filterStructureEfficiently(dataToFilter));
+  }, [searchFields]);
+
+  // Only refilter when data or search term changes
+  useEffect(() => {
+    if (searchTerm) {
+      filterData(searchTerm, data);
+    } else {
+      setFilteredData(data);
+    }
+  }, [data, searchTerm, filterData]);
+
+  // Update data when initialData changes
+  useEffect(() => {
+    setData(initialData);
+    if (searchTerm) {
+      filterData(searchTerm, initialData);
+    } else {
+      setFilteredData(initialData);
+    }
+  }, [initialData, searchTerm, filterData]);
+
+  const handleSearch = useCallback((term) => {
+    setSearchTerm(term);
+  }, []);
+
+  return { filteredData, handleSearch, searchTerm };
+};
