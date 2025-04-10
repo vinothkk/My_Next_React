@@ -1,3 +1,98 @@
+// Custom hook for advanced filtering with proper dependency management
+const useNestedDataFilter = (initialData, searchFields = ['name']) => {
+  // Store the original data
+  const [data] = useState(initialData);
+  
+  // Store the current search term
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Memoize the filtering function to prevent recreation on each render
+  const filterData = useCallback((term, dataToSearch) => {
+    if (!term) return dataToSearch;
+    
+    const termLower = term.toLowerCase();
+    const matchCache = new Map();
+    
+    // Check if item or its descendants match the search term
+    const itemOrDescendantsMatch = (item) => {
+      // Use id as cache key if available
+      const cacheKey = item.id || JSON.stringify(item);
+      
+      // Return cached result if available
+      if (matchCache.has(cacheKey)) {
+        return matchCache.get(cacheKey);
+      }
+      
+      // Check direct match
+      const directMatch = searchFields.some(field => 
+        item[field] && String(item[field]).toLowerCase().includes(termLower)
+      );
+      
+      if (directMatch) {
+        matchCache.set(cacheKey, true);
+        return true;
+      }
+      
+      // Check subRows
+      let hasMatchingDescendant = false;
+      if (item.subRows && Array.isArray(item.subRows)) {
+        hasMatchingDescendant = item.subRows.some(subItem => 
+          itemOrDescendantsMatch(subItem)
+        );
+      }
+      
+      matchCache.set(cacheKey, hasMatchingDescendant);
+      return hasMatchingDescendant;
+    };
+    
+    // Filter the data structure efficiently
+    const filterStructure = (items) => {
+      if (!items || !Array.isArray(items)) return [];
+      
+      return items
+        .filter(item => itemOrDescendantsMatch(item))
+        .map(item => {
+          // Create a shallow copy
+          const itemCopy = { ...item };
+          
+          // Filter subRows if they exist
+          if (item.subRows && Array.isArray(item.subRows)) {
+            itemCopy.subRows = item.subRows
+              .filter(subItem => itemOrDescendantsMatch(subItem))
+              .map(subItem => {
+                const subItemCopy = { ...subItem };
+                
+                // Handle deeper nesting
+                if (subItem.subRows && Array.isArray(subItem.subRows)) {
+                  subItemCopy.subRows = filterStructure(subItem.subRows);
+                }
+                
+                return subItemCopy;
+              });
+          }
+          
+          return itemCopy;
+        });
+    };
+    
+    // Apply the filter
+    return filterStructure(dataToSearch);
+  }, [searchFields]);
+  
+  // Memoize the filtered data - this prevents the infinite loop
+  const filteredData = useMemo(() => {
+    return filterData(searchTerm, initialData);
+  }, [filterData, searchTerm, initialData]);
+  
+  // Handler for search term changes
+  const handleSearch = useCallback((term) => {
+    setSearchTerm(term);
+  }, []);
+  
+  return { filteredData, handleSearch, searchTerm };
+};
+-=================================================================
+
 // Custom hook for advanced filtering with performance optimization
 const useNestedDataFilter = (initialData, searchFields = ['name']) => {
   const [data, setData] = useState(initialData);
