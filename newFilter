@@ -1,3 +1,25 @@
+// Check direct match
+const directMatch = searchFields.some(field => 
+  item[field] && String(item[field]).toLowerCase().includes(termLower)
+);
+
+//////////////////////////////////////////////////////////
+
+// Check direct match
+const directMatch = searchFields.some(field => 
+  item[field] && String(item[field]).toLowerCase() === termLower
+);/////////////\\/\/
+
+/// Check direct match - all search words must be present
+const searchWords = termLower.split(/\s+/);
+const directMatch = searchFields.some(field => {
+  if (!item[field]) return false;
+  const fieldValue = String(item[field]).toLowerCase();
+  return searchWords.every(word => fieldValue.includes(word));
+});/
+
+
+
 // Custom hook for advanced filtering with proper dependency management
 const useNestedDataFilter = (initialData, searchFields = ['name']) => {
   // Store the original data
