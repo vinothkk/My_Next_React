@@ -1,3 +1,77 @@
+Row Expad Start
+const useNestedDataFilter = (initialData, searchFields = ['name']) => {
+  const [data] = useState(initialData);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filterDataAndGetExpanded = useCallback((term, dataToSearch) => {
+    if (!term) return { filtered: dataToSearch, expanded: {} };
+
+    const termLower = term.toLowerCase();
+    const matchCache = new Map();
+    const expanded = {};
+
+    const itemOrDescendantsMatch = (item, parentId) => {
+      const cacheKey = item.id || JSON.stringify(item);
+      if (matchCache.has(cacheKey)) {
+        return matchCache.get(cacheKey);
+      }
+
+      const directMatch = searchFields.some(field =>
+        item[field] && String(item[field]).toLowerCase().includes(termLower)
+      );
+
+      let hasMatchingDescendant = false;
+      if (item.subRows && Array.isArray(item.subRows)) {
+        hasMatchingDescendant = item.subRows.some(subItem =>
+          itemOrDescendantsMatch(subItem, item.id || parentId)
+        );
+      }
+
+      const result = directMatch || hasMatchingDescendant;
+
+      // If a descendant matched, mark this row (by ID or index) as expanded
+      if (hasMatchingDescendant && (item.id || typeof parentId !== 'undefined')) {
+        const rowKey = item.id || parentId;
+        expanded[rowKey] = true;
+      }
+
+      matchCache.set(cacheKey, result);
+      return result;
+    };
+
+    const filterStructure = (items, parentId = null) => {
+      if (!Array.isArray(items)) return [];
+
+      return items
+        .filter(item => itemOrDescendantsMatch(item, parentId))
+        .map(item => {
+          const itemCopy = { ...item };
+
+          if (item.subRows && Array.isArray(item.subRows)) {
+            itemCopy.subRows = filterStructure(item.subRows, item.id || parentId);
+          }
+
+          return itemCopy;
+        });
+    };
+
+    const filtered = filterStructure(dataToSearch);
+    return { filtered, expanded };
+  }, [searchFields]);
+
+  const { filtered: filteredData, expanded: expandedRowIds } = useMemo(() => {
+    return filterDataAndGetExpanded(searchTerm, data);
+  }, [filterDataAndGetExpanded, searchTerm, data]);
+
+  const handleSearch = useCallback((term) => {
+    setSearchTerm(term);
+  }, []);
+
+  return { filteredData, handleSearch, searchTerm, expandedRowIds };
+};
+
+Row Expand End
+
 // Check direct match
 const directMatch = searchFields.some(field => 
   item[field] && String(item[field]).toLowerCase().includes(termLower)
