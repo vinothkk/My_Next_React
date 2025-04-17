@@ -1,0 +1,26 @@
+const [manualExpanded, setManualExpanded] = useState({});
+
+// Merge both programmatic + manual expands
+const mergedExpanded = useMemo(() => {
+  return {
+    ...manualExpanded,
+    ...expandedRowIds, // from search or default
+  };
+}, [manualExpanded, expandedRowIds]);
+
+<MaterialReactTable
+  columns={columns}
+  data={filteredData}
+  enableFilters={true}
+  enableExpandAll={false}
+  enableExpanding={true}
+  getRowId={(row) => row.id} // crucial!
+  globalFilter={searchTerm}
+  onGlobalFilterChange={(e) => handleSearch(e.target.value)}
+  onExpandedChange={setManualExpanded}
+  state={{ expanded: mergedExpanded }}
+  muiSearchTextFieldProps={{
+    placeholder: 'Search all records...',
+    variant: 'outlined',
+  }}
+/>
