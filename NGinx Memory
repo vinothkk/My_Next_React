@@ -1,0 +1,27 @@
+NGinx 
+
+Even if 100 users access your app, ECS does NOT create a new container/task for each user.
+Your front-end app (served via nginx) runs inside one or more containers, and each container handles multiple user requests concurrently.
+
+Loads the React app (served via nginx)
+    Downloads:
+        index.html (~5KB)
+        main.js (~300KB)
+        style.css (~100KB)
+        Other assets (images, fonts) — ~500KB
+    Makes 10 API calls (some returning 25MB each)
+
+
+
+nginx Memory Impact Estimation
+----------------------------------------------------------------------------------
+Task	 											Memory Impact
+Serving static assets (HTML, JS, CSS)				 ~1–2 MB max (very efficient)
+Proxying small API responses						 ~1–2 MB (buffered briefly)
+Proxying large API response (25MB × 2)				 ~50–60 MB temporary buffer usage
+Total for one active user (peak during full load)	 ~60–70 MB (temporary peak)
+
+One user can cause nginx to use ~60–70MB extra RAM temporarily, especially when large API responses are being buffered.
+
+
+ if 100+ users access nginx memory will increase if requests are concurrent and large When responses are huge (25MB+), or you get high concurrency Tune buffers, increase ECS RAM, use CDNs, monitor usage, gzip responses
