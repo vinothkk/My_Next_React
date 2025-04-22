@@ -1,3 +1,209 @@
+
+import React, { useState, useCallback, useMemo } from 'react';
+
+// Utility function to escape special characters for RegExp
+function escapeRegExp(string) {
+    // $& means the whole matched string
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Custom Hook: useNestedDataFilter
+const useNestedDataFilter = (initialData, searchFields = ['name']) => {
+    // Store the current search term
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Function to highlight text based on the search term
+    const highlightText = useCallback((text, term) => {
+        if (!term) return text; // Return original text if no search term
+        if (text === null || typeof text === 'undefined') return ''; // Handle null/undefined input
+
+        const textStr = String(text); // Ensure text is a string
+        const escapedSearchTerm = escapeRegExp(term);
+        // Using 'gi' for global, case-insensitive match
+        const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
+        const result = [];
+        let lastIndex = 0;
+
+        // Check if matchAll is supported (ES2020)
+        if (typeof textStr.matchAll !== 'function') {
+            console.warn("String.prototype.matchAll() not supported. Highlighting may be limited.");
+            // Provide a simple fallback or just return the text
+            const index = textStr.toLowerCase().indexOf(term.toLowerCase());
+             if (index === -1) return textStr;
+             // Basic highlighting (first match only)
+             return [
+                 textStr.substring(0, index),
+                 <mark key={`${index}-match`}>{textStr.substring(index, index + term.length)}</mark>,
+                 textStr.substring(index + term.length)
+             ];
+        }
+
+        // Use matchAll to find all occurrences
+        for (const match of textStr.matchAll(regex)) {
+            const start = match.index;
+            const matchedString = match[0]; // The actual substring that matched
+
+            // Add text segment before the current match
+            if (start > lastIndex) {
+                result.push(textStr.slice(lastIndex, start));
+            }
+            // Add the highlighted match segment
+            // Use index and matched string for a more stable key
+            result.push(<mark key={`${start}-${matchedString}`}>{matchedString}</mark>);
+            lastIndex = start + matchedString.length;
+        }
+
+        // Add any remaining text after the last match
+        if (lastIndex < textStr.length) {
+            result.push(textStr.slice(lastIndex));
+        }
+
+        // If no matches were found, result array will be empty, return original text
+        return result.length > 0 ? result : textStr;
+    }, []);
+
+    // Memoize the core filtering logic
+    const filterData = useCallback((term, dataToSearch) => {
+        const expanded = {}; // Stores IDs of parent rows that should be expanded because a child matched
+        const matchCache = new Map(); // Caches matching results for performance { rowId: boolean }
+        const parentsMap = new Map(); // Track parent-child relationships
+
+        // If no search term, return the original data and empty expansion set
+        if (!term) return { filtered: dataToSearch, expanded: {} };
+
+        const termLower = term.toLowerCase();
+
+        // Pre-process the data to build parent-child relationships and row ID mappings
+        // This helps us properly expand all parents when a child matches
+        const buildParentRelationships = (items, parentId = null) => {
+            if (!items || !Array.isArray(items)) return;
+            
+            items.forEach(item => {
+                if (!item.id) return;
+                
+                // Store parent relationship
+                if (parentId) {
+                    parentsMap.set(item.id, parentId);
+                }
+                
+                // Process children recursively
+                if (item.subRows && Array.isArray(item.subRows)) {
+                    buildParentRelationships(item.subRows, item.id);
+                }
+            });
+        };
+        
+        // Build the parent-child relationship map
+        buildParentRelationships(dataToSearch);
+
+        // Function to expand all parents recursively
+        const expandAllParents = (itemId) => {
+            let currentId = itemId;
+            
+            while (currentId) {
+                expanded[currentId] = true;
+                currentId = parentsMap.get(currentId);
+            }
+        };
+
+        // Recursive function to check if an item or any descendants match the search
+        const itemOrDescendantsMatch = (item) => {
+            if (!item || !item.id) return false;
+
+            // Use item.id as cache key
+            if (matchCache.has(item.id)) {
+                return matchCache.get(item.id);
+            }
+
+            // Check if any field in current item matches the search term
+            const directMatch = searchFields.some(field =>
+                item[field] && String(item[field]).toLowerCase().includes(termLower)
+            );
+
+            // Check descendants for matches
+            let hasMatchingDescendant = false;
+            if (item.subRows && Array.isArray(item.subRows)) {
+                hasMatchingDescendant = item.subRows.some(subItem => 
+                    itemOrDescendantsMatch(subItem)
+                );
+            }
+
+            // Result: true if direct match or any descendant matches
+            const result = directMatch || hasMatchingDescendant;
+            
+            // If this item matches or has matching descendants, expand all parent rows
+            if (result) {
+                // If matching descendants, expand this row
+                if (hasMatchingDescendant) {
+                    expanded[item.id] = true;
+                }
+                
+                // Expand all parent rows
+                expandAllParents(parentsMap.get(item.id));
+            }
+
+            // Cache result for this item
+            matchCache.set(item.id, result);
+            return result;
+        };
+
+        // Process the data to filter and highlight matches
+        const filterStructure = (items) => {
+            if (!items || !Array.isArray(items)) return [];
+
+            return items
+                .filter(item => itemOrDescendantsMatch(item))
+                .map(item => {
+                    // Create a shallow copy to avoid mutating the original
+                    const itemCopy = { ...item };
+
+                    // Highlight matching text in each searchable field
+                    searchFields.forEach(field => {
+                        if (itemCopy[field]) {
+                            itemCopy[field] = highlightText(String(item[field]), term);
+                        }
+                    });
+
+                    // Process subRows if they exist
+                    if (itemCopy.subRows && Array.isArray(itemCopy.subRows)) {
+                        itemCopy.subRows = filterStructure(itemCopy.subRows);
+                    }
+
+                    return itemCopy;
+                });
+        };
+
+        // Apply the filtering process starting from top level
+        const filtered = filterStructure(dataToSearch);
+
+        return { filtered, expanded };
+    }, [searchFields, highlightText]);
+
+    // Memoize the filtered data and expansion state
+    const { filtered: filteredDataProduct, expanded: expandedRowIds } = useMemo(() => {
+        return filterData(searchTerm, initialData);
+    }, [filterData, searchTerm, initialData]);
+
+    // Handler to update the search term
+    const handleSearch = useCallback((term) => {
+        setSearchTerm(term);
+    }, []);
+
+    // Return values needed by the component
+    return {
+        filteredDataProduct,  // The filtered data with highlights
+        handleSearch,         // Function to call when search changes
+        searchTerm,           // Current search term
+        expandedRowIds        // Object with row IDs that should be expanded
+    };
+};
+
+export default useNestedDataFilter;
+======================================================
+
+not working in second level child so we added above code
+======================================
+
 import React, { useState, useCallback, useMemo } from 'react';
 
 // Utility function to escape special characters for RegExp
