@@ -66,7 +66,6 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
         const matchCache = new Map(); // Caches matching results for performance
         const parentsMap = new Map(); // Track parent-child relationships
         const uniquePathsMap = new Map(); // Store unique path IDs for each row
-        const valuesMergeMap = new Map(); // Store values to be merged up
 
         // If no search term, return the original data and empty expansion set
         if (!term) return { filtered: dataToSearch, expanded: {} };
@@ -113,43 +112,8 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
             }
         };
 
-        // Recursive function to collect values from matching subrows
-        const collectMatchingValues = (item) => {
-            if (!item || !item.subRows || !Array.isArray(item.subRows)) return null;
-            
-            const matchingValues = {};
-            
-            // Collect values from direct subrows that match
-            item.subRows.forEach(subItem => {
-                const subMatches = searchFields.some(field =>
-                    subItem[field] && String(subItem[field]).toLowerCase().includes(termLower)
-                );
-                
-                if (subMatches) {
-                    // Collect matching values from this subrow
-                    searchFields.forEach(field => {
-                        if (subItem[field] && String(subItem[field]).toLowerCase().includes(termLower)) {
-                            if (!matchingValues[field]) matchingValues[field] = [];
-                            matchingValues[field].push(subItem[field]);
-                        }
-                    });
-                }
-                
-                // Collect from deeper levels recursively
-                const deeperValues = collectMatchingValues(subItem);
-                if (deeperValues) {
-                    // Merge deeper values with current level values
-                    Object.keys(deeperValues).forEach(field => {
-                        if (!matchingValues[field]) matchingValues[field] = [];
-                        matchingValues[field].push(...deeperValues[field]);
-                    });
-                }
-            });
-            
-            return Object.keys(matchingValues).length > 0 ? matchingValues : null;
-        };
-
         // Recursive function to check if an item or any descendants match the search
+        // This function now handles deep nesting (three levels or more)
         const itemOrDescendantsMatch = (item) => {
             if (!item) return false;
             
@@ -167,20 +131,12 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
                 item[field] && String(item[field]).toLowerCase().includes(termLower)
             );
 
-            // Check descendants for matches
+            // Check descendants for matches (handles any depth of nesting)
             let hasMatchingDescendant = false;
             if (item.subRows && Array.isArray(item.subRows)) {
                 hasMatchingDescendant = item.subRows.some(subItem => 
                     itemOrDescendantsMatch(subItem)
                 );
-                
-                // If any descendants match, collect their values
-                if (hasMatchingDescendant) {
-                    const matchingValues = collectMatchingValues(item);
-                    if (matchingValues) {
-                        valuesMergeMap.set(itemPath, matchingValues);
-                    }
-                }
             }
 
             // Result: true if direct match or any descendant matches
@@ -212,7 +168,7 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
             return items
                 .filter(item => itemOrDescendantsMatch(item))
                 .map(item => {
-                    // Create a deep copy to avoid mutating the original
+                    // Create a shallow copy to avoid mutating the original
                     const itemCopy = { ...item };
 
                     // Highlight matching text in each searchable field
@@ -221,32 +177,8 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
                             itemCopy[field] = highlightText(String(item[field]), term);
                         }
                     });
-                    
-                    // Get the unique path for this item
-                    const itemPath = uniquePathsMap.get(item);
-                    
-                    // Merge values from matching subrows if any
-                    if (valuesMergeMap.has(itemPath)) {
-                        const matchingValues = valuesMergeMap.get(itemPath);
-                        
-                        // Add merged values to parent
-                        Object.keys(matchingValues).forEach(field => {
-                            const uniqueValues = [...new Set(matchingValues[field])];
-                            
-                            // Create a merged field with a special name to distinguish
-                            const mergedFieldName = `${field}_merged`;
-                            
-                            // Join values with comma if there are multiple values
-                            itemCopy[mergedFieldName] = uniqueValues.length > 1 
-                                ? uniqueValues.join(', ') 
-                                : uniqueValues[0];
-                            
-                            // Highlight the merged value as well
-                            itemCopy[mergedFieldName] = highlightText(itemCopy[mergedFieldName], term);
-                        });
-                    }
 
-                    // Process subRows if they exist
+                    // Process subRows if they exist (recursively up to any depth)
                     if (itemCopy.subRows && Array.isArray(itemCopy.subRows)) {
                         itemCopy.subRows = filterStructure(itemCopy.subRows);
                     }
