@@ -9,6 +9,14 @@ function escapeRegExp(string) {
 const useNestedDataFilter = (initialData, searchFields = ['name']) => {
     // Store the current search term
     const [searchTerm, setSearchTerm] = useState('');
+    
+    // DEBUG: Add a debug function to check for potential issues
+    const debugData = useCallback((data, label) => {
+        console.log(`DEBUG ${label}:`, JSON.stringify(data, (key, value) => {
+            // Prevent circular references for debugging output
+            return key === 'parent' ? '[PARENT]' : value;
+        }, 2).substring(0, 200) + "..."); // Show only the beginning to keep logs manageable
+    }, []);
 
     // Function to highlight text based on the search term
     const highlightText = useCallback((text, term) => {
@@ -62,6 +70,9 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
 
     // Memoize the core filtering logic
     const filterData = useCallback((term, dataToSearch) => {
+        // DEBUG: Check the initial data structure
+        debugData(dataToSearch, "Initial Data");
+        
         const expanded = {}; // Stores IDs of parent rows that should be expanded because a child matched
         const matchCache = new Map(); // Caches matching results for performance
         const parentsMap = new Map(); // Track parent-child relationships
@@ -161,12 +172,17 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
         };
 
         // Process the data to filter and highlight matches
-        const filterStructure = (items) => {
+        const filterStructure = (items, level = 0) => {
             if (!items || !Array.isArray(items)) return [];
 
             return items
                 .filter(item => itemOrDescendantsMatch(item))
                 .map(item => {
+                    // DEBUG: Before processing
+                    if (level === 0) {
+                        debugData(item, `Original Item at Level ${level}`);
+                    }
+                    
                     // Create a new object with only the properties we want to modify
                     // This ensures we don't modify the original and don't merge subrow values
                     const newItem = {};
@@ -187,7 +203,12 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
                     // Handle subRows separately to avoid any merging
                     if (item.subRows && Array.isArray(item.subRows)) {
                         // Process subRows recursively
-                        newItem.subRows = filterStructure(item.subRows);
+                        newItem.subRows = filterStructure(item.subRows, level + 1);
+                    }
+
+                    // DEBUG: After processing
+                    if (level === 0) {
+                        debugData(newItem, `Processed Item at Level ${level}`);
                     }
 
                     return newItem;
@@ -196,6 +217,9 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
 
         // Apply the filtering process starting from top level
         const filtered = filterStructure(dataToSearch);
+        
+        // DEBUG: Check the filtered data structure
+        debugData(filtered, "Final Filtered Data");
 
         // Convert our path-based expanded IDs to match the format needed by Material React Table
         const expandedForTable = {};
@@ -217,8 +241,11 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
             }
         });
 
+        // DEBUG: Check expanded state
+        console.log("Expanded State:", expandedForTable);
+
         return { filtered, expanded: expandedForTable };
-    }, [searchFields, highlightText]);
+    }, [searchFields, highlightText, debugData]);
 
     // Memoize the filtered data and expansion state
     const { filtered: filteredDataProduct, expanded: expandedRowIds } = useMemo(() => {
@@ -235,7 +262,12 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
         filteredDataProduct,  // The filtered data with highlights
         handleSearch,         // Function to call when search changes
         searchTerm,           // Current search term
-        expandedRowIds        // Object with row IDs that should be expanded
+        expandedRowIds,       // Object with row IDs that should be expanded
+        // DEBUG: Add some debug helpers
+        debug: {
+            checkData: (data) => debugData(data, "Manual Debug"),
+            checkFiltered: () => debugData(filteredDataProduct, "Current Filtered Data")
+        }
     };
 };
 
