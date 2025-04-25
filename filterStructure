@@ -113,7 +113,6 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
         };
 
         // Recursive function to check if an item or any descendants match the search
-        // This function now handles deep nesting (three levels or more)
         const itemOrDescendantsMatch = (item) => {
             if (!item) return false;
             
@@ -168,22 +167,30 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
             return items
                 .filter(item => itemOrDescendantsMatch(item))
                 .map(item => {
-                    // Create a shallow copy to avoid mutating the original
-                    const itemCopy = { ...item };
-
-                    // Highlight matching text in each searchable field
-                    searchFields.forEach(field => {
-                        if (itemCopy[field]) {
-                            itemCopy[field] = highlightText(String(item[field]), term);
+                    // Create a new object with only the properties we want to modify
+                    // This ensures we don't modify the original and don't merge subrow values
+                    const newItem = {};
+                    
+                    // Copy all original properties except subRows
+                    Object.keys(item).forEach(key => {
+                        if (key !== 'subRows') {
+                            // For searchable fields, apply highlighting
+                            if (searchFields.includes(key) && item[key]) {
+                                newItem[key] = highlightText(String(item[key]), term);
+                            } else {
+                                // For non-searchable fields, just copy the value
+                                newItem[key] = item[key];
+                            }
                         }
                     });
-
-                    // Process subRows if they exist (recursively up to any depth)
-                    if (itemCopy.subRows && Array.isArray(itemCopy.subRows)) {
-                        itemCopy.subRows = filterStructure(itemCopy.subRows);
+                    
+                    // Handle subRows separately to avoid any merging
+                    if (item.subRows && Array.isArray(item.subRows)) {
+                        // Process subRows recursively
+                        newItem.subRows = filterStructure(item.subRows);
                     }
 
-                    return itemCopy;
+                    return newItem;
                 });
         };
 
@@ -201,8 +208,6 @@ const useNestedDataFilter = (initialData, searchFields = ['name']) => {
             const lastPart = parts[parts.length - 1];
             
             // Extract the row ID part - we'll use this for MRT's expanded state
-            // This is a compromise - we're assuming MRT's getRowId returns something 
-            // we can derive from our path
             const rowIdMatch = lastPart.match(/(\d+)-(\d+)/);
             if (rowIdMatch) {
                 const index = rowIdMatch[1];
