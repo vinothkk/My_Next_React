@@ -1,167 +1,39 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+const processNestedData = (items, level = 0, parentIndex = null) => {
+  if (!items || !Array.isArray(items)) return [];
 
-// Utility function to escape special characters for RegExp
-function escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+  return items
+    .map((item, index) => {
+      let matchesCurrentItem = false;
+      const newItem = { ...item }; // Create shallow copy to avoid mutation
 
-// Custom Hook: useNestedDataFilter
-const useNestedDataFilter = (initialData, searchFields = ['name']) => {
-  // State for data management
-  const [data, setData] = useState(initialData);
-  const [filteredData, setFilteredData] = useState(initialData);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [expandedRows, setExpandedRows] = useState({});
-  
-  // Update source data if it changes externally
-  useEffect(() => {
-    setData(initialData);
-    // Apply existing filter to new data
-    if (searchTerm) {
-      filterData(searchTerm, initialData);
-    } else {
-      setFilteredData(initialData);
-      setExpandedRows({});
-    }
-  }, [initialData, searchTerm]);
-
-  // Function to highlight text based on search term
-  const highlightText = useCallback((text, term) => {
-    if (!term) return text;
-    if (text === null || typeof text === 'undefined') return '';
-    
-    const textStr = String(text);
-    const escapedSearchTerm = escapeRegExp(term);
-    const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
-    const result = [];
-    let lastIndex = 0;
-    
-    // Check if matchAll is supported
-    if (typeof textStr.matchAll !== 'function') {
-      const index = textStr.toLowerCase().indexOf(term.toLowerCase());
-      if (index === -1) return textStr;
-      return [
-        textStr.substring(0, index),
-        <mark key={`${index}-match`}>{textStr.substring(index, index + term.length)}</mark>,
-        textStr.substring(index + term.length)
-      ];
-    }
-    
-    // Process all matches
-    for (const match of textStr.matchAll(regex)) {
-      const start = match.index;
-      const matchedString = match[0];
-      
-      if (start > lastIndex) {
-        result.push(textStr.slice(lastIndex, start));
-      }
-      result.push(<mark key={`${start}-${matchedString}`}>{matchedString}</mark>);
-      lastIndex = start + matchedString.length;
-    }
-    
-    if (lastIndex < textStr.length) {
-      result.push(textStr.slice(lastIndex));
-    }
-    
-    return result.length > 0 ? result : textStr;
-  }, []);
-
-  // Memoized filter and highlight function
-  const filterAndHighlight = useMemo(() => (term, dataToFilter) => {
-    if (!term) {
-      setFilteredData(dataToFilter);
-      setExpandedRows({});
-      return;
-    }
-    
-    const termLower = term.toLowerCase();
-    const expandedState = {};
-    
-    // Deep clone to avoid mutating original data
-    const result = JSON.parse(JSON.stringify(dataToFilter));
-    
-    // Helper function to track expanded state when matches are found in children
-    const trackExpanded = (rowId, level, index) => {
-      if (level === 0) {
-        expandedState[`${index}-${rowId}`] = true;
-      } else if (level === 1) {
-        // For second level, we need parent's expanded state
-        expandedState[`${index}-${rowId}`] = true;
-      }
-    };
-    
-    // Process data through all three levels with highlighting
-    const processNestedData = (items, level = 0, parentIndex = null) => {
-      if (!items || !Array.isArray(items)) return [];
-      
-      return items.filter((item, index) => {
-        // Check if current item matches search
-        let matchesCurrentItem = false;
-        
-        // Apply highlighting to matched fields and check for matches
-        searchFields.forEach(field => {
-          if (item[field] && String(item[field]).toLowerCase().includes(termLower)) {
-            matchesCurrentItem = true;
-            // Highlight the matching text
-            item[field] = highlightText(String(item[field]), term);
-          }
-        });
-        
-        // First level of nesting (subRows)
-        if (item.subRows && Array.isArray(item.subRows)) {
-          item.subRows = processNestedData(item.subRows, level + 1, index);
-          
-          // If any first-level children match, expand this row
-          if (item.subRows.length > 0 && !matchesCurrentItem) {
-            trackExpanded(item.id, level, index);
-          }
+      // Highlight and check match
+      searchFields.forEach(field => {
+        if (newItem[field] && String(newItem[field]).toLowerCase().includes(termLower)) {
+          matchesCurrentItem = true;
+          newItem[field] = highlightText(String(newItem[field]), term);
         }
-        
-        // Check deeper level - second level of nesting (subRows within subRows)
-        // This handles the third level of depth
-        let hasMatchingGrandchild = false;
-        if (item.subRows && item.subRows.length > 0) {
-          for (const subItem of item.subRows) {
-            if (subItem.subRows && Array.isArray(subItem.subRows)) {
-              subItem.subRows = processNestedData(subItem.subRows, level + 2, index);
-              
-              // If any second-level children match, we need to expand both levels
-              if (subItem.subRows.length > 0) {
-                hasMatchingGrandchild = true;
-                // Track expansion for both the child and parent
-                if (level === 0) {
-                  trackExpanded(item.id, level, index);
-                  trackExpanded(subItem.id, level + 1, index);
-                }
-              }
-            }
-          }
-        }
-        
-        // Keep this item if it matches OR if any children/grandchildren match
-        return matchesCurrentItem || 
-               (item.subRows && item.subRows.length > 0) || 
-               hasMatchingGrandchild;
       });
-    };
-    
-    const processed = processNestedData(result);
-    setFilteredData(processed);
-    setExpandedRows(expandedState);
-  }, [searchFields, highlightText]);
 
-  // Handle search term changes
-  const handleSearch = useCallback((term) => {
-    setSearchTerm(term);
-    filterAndHighlight(term, data);
-  }, [data, filterAndHighlight]);
+      // Process subRows recursively (1st level)
+      let filteredSubRows = [];
+      if (Array.isArray(newItem.subRows)) {
+        filteredSubRows = processNestedData(newItem.subRows, level + 1, index);
+      }
 
-  return { 
-    filteredDataProduct: filteredData, 
-    handleSearch, 
-    searchTerm,
-    expandedRowIds: expandedRows
-  };
+      // Only include subRows if they matched
+      if (filteredSubRows.length > 0) {
+        newItem.subRows = filteredSubRows;
+        trackExpanded(newItem.id, level, index);
+      } else {
+        delete newItem.subRows; // Remove subRows if empty
+      }
+
+      // Include row only if it or its children matched
+      if (matchesCurrentItem || filteredSubRows.length > 0) {
+        return newItem;
+      }
+
+      return null; // Otherwise, filter it out
+    })
+    .filter(Boolean); // Remove nulls
 };
-
-export default useNestedDataFilter;
