@@ -1,0 +1,62 @@
+const filterStructure = (items) => {
+    if (!items || !Array.isArray(items)) return [];
+
+    return items
+        .map(item => {
+            const itemPath = uniquePathsMap.get(item);
+            const itemCopy = { ...item };
+
+            // Combine all text to search from item and all subrows recursively
+            const collectMatchingText = (node) => {
+                let matched = false;
+                const mergedFields = {};
+
+                // Check if any direct field matches
+                searchFields.forEach(field => {
+                    if (node[field] && String(node[field]).toLowerCase().includes(termLower)) {
+                        matched = true;
+                        if (!mergedFields[field]) mergedFields[field] = [];
+                        mergedFields[field].push(node[field]);
+                    }
+                });
+
+                // Recursively check children
+                if (node.subRows && Array.isArray(node.subRows)) {
+                    node.subRows.forEach(child => {
+                        const result = collectMatchingText(child);
+                        if (result.matched) {
+                            matched = true;
+                            searchFields.forEach(field => {
+                                if (result.mergedFields[field]) {
+                                    if (!mergedFields[field]) mergedFields[field] = [];
+                                    mergedFields[field].push(...result.mergedFields[field]);
+                                }
+                            });
+                        }
+                    });
+                }
+
+                return { matched, mergedFields };
+            };
+
+            const { matched, mergedFields } = collectMatchingText(itemCopy);
+
+            if (!matched) return null;
+
+            // Merge and highlight fields in the parent
+            searchFields.forEach(field => {
+                const values = mergedFields[field] || [];
+                const fullText = values.join(' | ');
+                itemCopy[field] = highlightText(fullText, term);
+            });
+
+            // Important: Remove subRows to flatten
+            delete itemCopy.subRows;
+
+            // Mark parent as expanded
+            if (itemPath) expandAllParents(itemPath);
+
+            return itemCopy;
+        })
+        .filter(Boolean); // Remove nulls
+};
