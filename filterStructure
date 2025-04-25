@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 // Utility function to escape special characters for RegExp
 function escapeRegExp(string) {
@@ -7,268 +7,161 @@ function escapeRegExp(string) {
 
 // Custom Hook: useNestedDataFilter
 const useNestedDataFilter = (initialData, searchFields = ['name']) => {
-    // Store the current search term
-    const [searchTerm, setSearchTerm] = useState('');
+  // State for data management
+  const [data, setData] = useState(initialData);
+  const [filteredData, setFilteredData] = useState(initialData);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [expandedRows, setExpandedRows] = useState({});
+  
+  // Update source data if it changes externally
+  useEffect(() => {
+    setData(initialData);
+    // Apply existing filter to new data
+    if (searchTerm) {
+      filterData(searchTerm, initialData);
+    } else {
+      setFilteredData(initialData);
+      setExpandedRows({});
+    }
+  }, [initialData, searchTerm]);
+
+  // Function to highlight text based on search term
+  const highlightText = useCallback((text, term) => {
+    if (!term) return text;
+    if (text === null || typeof text === 'undefined') return '';
     
-    // DEBUG: Add a debug function to check for potential issues
-    const debugData = useCallback((data, label) => {
-        console.log(`DEBUG ${label}:`, JSON.stringify(data, (key, value) => {
-            // Prevent circular references for debugging output
-            return key === 'parent' ? '[PARENT]' : value;
-        }, 2).substring(0, 200) + "..."); // Show only the beginning to keep logs manageable
-    }, []);
+    const textStr = String(text);
+    const escapedSearchTerm = escapeRegExp(term);
+    const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
+    const result = [];
+    let lastIndex = 0;
+    
+    // Check if matchAll is supported
+    if (typeof textStr.matchAll !== 'function') {
+      const index = textStr.toLowerCase().indexOf(term.toLowerCase());
+      if (index === -1) return textStr;
+      return [
+        textStr.substring(0, index),
+        <mark key={`${index}-match`}>{textStr.substring(index, index + term.length)}</mark>,
+        textStr.substring(index + term.length)
+      ];
+    }
+    
+    // Process all matches
+    for (const match of textStr.matchAll(regex)) {
+      const start = match.index;
+      const matchedString = match[0];
+      
+      if (start > lastIndex) {
+        result.push(textStr.slice(lastIndex, start));
+      }
+      result.push(<mark key={`${start}-${matchedString}`}>{matchedString}</mark>);
+      lastIndex = start + matchedString.length;
+    }
+    
+    if (lastIndex < textStr.length) {
+      result.push(textStr.slice(lastIndex));
+    }
+    
+    return result.length > 0 ? result : textStr;
+  }, []);
 
-    // Function to highlight text based on the search term
-    const highlightText = useCallback((text, term) => {
-        if (!term) return text; // Return original text if no search term
-        if (text === null || typeof text === 'undefined') return ''; // Handle null/undefined input
-
-        const textStr = String(text); // Ensure text is a string
-        const escapedSearchTerm = escapeRegExp(term);
-        // Using 'gi' for global, case-insensitive match
-        const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
-        const result = [];
-        let lastIndex = 0;
-
-        // Check if matchAll is supported (ES2020)
-        if (typeof textStr.matchAll !== 'function') {
-            console.warn("String.prototype.matchAll() not supported. Highlighting may be limited.");
-            // Provide a simple fallback or just return the text
-            const index = textStr.toLowerCase().indexOf(term.toLowerCase());
-             if (index === -1) return textStr;
-             // Basic highlighting (first match only)
-             return [
-                 textStr.substring(0, index),
-                 <mark key={`${index}-match`}>{textStr.substring(index, index + term.length)}</mark>,
-                 textStr.substring(index + term.length)
-             ];
-        }
-
-        // Use matchAll to find all occurrences
-        for (const match of textStr.matchAll(regex)) {
-            const start = match.index;
-            const matchedString = match[0]; // The actual substring that matched
-
-            // Add text segment before the current match
-            if (start > lastIndex) {
-                result.push(textStr.slice(lastIndex, start));
-            }
-            // Add the highlighted match segment
-            // Use index and matched string for a more stable key
-            result.push(<mark key={`${start}-${matchedString}`}>{matchedString}</mark>);
-            lastIndex = start + matchedString.length;
-        }
-
-        // Add any remaining text after the last match
-        if (lastIndex < textStr.length) {
-            result.push(textStr.slice(lastIndex));
-        }
-
-        // If no matches were found, result array will be empty, return original text
-        return result.length > 0 ? result : textStr;
-    }, []);
-
-    // Memoize the core filtering logic
-    const filterData = useCallback((term, dataToSearch) => {
-        // DEBUG: Check the initial data structure
-        debugData(dataToSearch, "Initial Data");
-        
-        const expanded = {}; // Stores IDs of parent rows that should be expanded because a child matched
-        const matchCache = new Map(); // Caches matching results for performance
-        const parentsMap = new Map(); // Track parent-child relationships
-        const uniquePathsMap = new Map(); // Store unique path IDs for each row
-
-        // If no search term, return the original data and empty expansion set
-        if (!term) return { filtered: dataToSearch, expanded: {} };
-
-        const termLower = term.toLowerCase();
-
-        // Pre-process the data to build unique path IDs and parent-child relationships
-        const buildUniquePathsAndRelationships = (items, parentPath = null, level = 0) => {
-            if (!items || !Array.isArray(items)) return;
-            
-            items.forEach((item, index) => {
-                if (!item || !item.id) return;
-                
-                // Create truly unique path ID for this item that includes full ancestry
-                const itemPath = parentPath 
-                    ? `${parentPath}/${item.id}-${index}` 
-                    : `root/${index}-${item.id}`;
-                
-                // Store this unique path
-                uniquePathsMap.set(item, itemPath);
-                
-                // Store parent relationship
-                if (parentPath) {
-                    parentsMap.set(itemPath, parentPath);
-                }
-                
-                // Process children recursively
-                if (item.subRows && Array.isArray(item.subRows)) {
-                    buildUniquePathsAndRelationships(item.subRows, itemPath, level + 1);
-                }
-            });
-        };
-        
-        // Build the unique paths and parent-child relationship map
-        buildUniquePathsAndRelationships(dataToSearch);
-
-        // Function to expand all parents recursively
-        const expandAllParents = (itemPath) => {
-            let currentPath = itemPath;
-            
-            while (currentPath) {
-                expanded[currentPath] = true;
-                currentPath = parentsMap.get(currentPath);
-            }
-        };
-
-        // Recursive function to check if an item or any descendants match the search
-        const itemOrDescendantsMatch = (item) => {
-            if (!item) return false;
-            
-            // Get unique path for this item
-            const itemPath = uniquePathsMap.get(item);
-            if (!itemPath) return false;
-
-            // Use itemPath as cache key
-            if (matchCache.has(itemPath)) {
-                return matchCache.get(itemPath);
-            }
-
-            // Check if any field in current item matches the search term
-            const directMatch = searchFields.some(field =>
-                item[field] && String(item[field]).toLowerCase().includes(termLower)
-            );
-
-            // Check descendants for matches (handles any depth of nesting)
-            let hasMatchingDescendant = false;
-            if (item.subRows && Array.isArray(item.subRows)) {
-                hasMatchingDescendant = item.subRows.some(subItem => 
-                    itemOrDescendantsMatch(subItem)
-                );
-            }
-
-            // Result: true if direct match or any descendant matches
-            const result = directMatch || hasMatchingDescendant;
-            
-            // If this item matches or has matching descendants, expand all parent rows
-            if (result) {
-                // If matching descendants, expand this row
-                if (hasMatchingDescendant) {
-                    expanded[itemPath] = true;
-                }
-                
-                // Expand all parent rows
-                const parentPath = parentsMap.get(itemPath);
-                if (parentPath) {
-                    expandAllParents(parentPath);
-                }
-            }
-
-            // Cache result for this item
-            matchCache.set(itemPath, result);
-            return result;
-        };
-
-        // Process the data to filter and highlight matches
-        const filterStructure = (items, level = 0) => {
-            if (!items || !Array.isArray(items)) return [];
-
-            return items
-                .filter(item => itemOrDescendantsMatch(item))
-                .map(item => {
-                    // DEBUG: Before processing
-                    if (level === 0) {
-                        debugData(item, `Original Item at Level ${level}`);
-                    }
-                    
-                    // Create a new object with only the properties we want to modify
-                    // This ensures we don't modify the original and don't merge subrow values
-                    const newItem = {};
-                    
-                    // Copy all original properties except subRows
-                    Object.keys(item).forEach(key => {
-                        if (key !== 'subRows') {
-                            // For searchable fields, apply highlighting
-                            if (searchFields.includes(key) && item[key]) {
-                                newItem[key] = highlightText(String(item[key]), term);
-                            } else {
-                                // For non-searchable fields, just copy the value
-                                newItem[key] = item[key];
-                            }
-                        }
-                    });
-                    
-                    // Handle subRows separately to avoid any merging
-                    if (item.subRows && Array.isArray(item.subRows)) {
-                        // Process subRows recursively
-                        newItem.subRows = filterStructure(item.subRows, level + 1);
-                    }
-
-                    // DEBUG: After processing
-                    if (level === 0) {
-                        debugData(newItem, `Processed Item at Level ${level}`);
-                    }
-
-                    return newItem;
-                });
-        };
-
-        // Apply the filtering process starting from top level
-        const filtered = filterStructure(dataToSearch);
-        
-        // DEBUG: Check the filtered data structure
-        debugData(filtered, "Final Filtered Data");
-
-        // Convert our path-based expanded IDs to match the format needed by Material React Table
-        const expandedForTable = {};
-        
-        // Process expanded paths to match Material React Table's expected format
-        Object.keys(expanded).forEach(path => {
-            // For Material React Table, we need to extract the row ID from our path
-            // The path format is 'root/0-id' or 'parentPath/id-index'
-            const parts = path.split('/');
-            const lastPart = parts[parts.length - 1];
-            
-            // Extract the row ID part - we'll use this for MRT's expanded state
-            const rowIdMatch = lastPart.match(/(\d+)-(\d+)/);
-            if (rowIdMatch) {
-                const index = rowIdMatch[1];
-                const id = rowIdMatch[2];
-                // Use a format that hopefully matches your MRT getRowId
-                expandedForTable[`${index}-${id}`] = true;
-            }
-        });
-
-        // DEBUG: Check expanded state
-        console.log("Expanded State:", expandedForTable);
-
-        return { filtered, expanded: expandedForTable };
-    }, [searchFields, highlightText, debugData]);
-
-    // Memoize the filtered data and expansion state
-    const { filtered: filteredDataProduct, expanded: expandedRowIds } = useMemo(() => {
-        return filterData(searchTerm, initialData);
-    }, [filterData, searchTerm, initialData]);
-
-    // Handler to update the search term
-    const handleSearch = useCallback((term) => {
-        setSearchTerm(term);
-    }, []);
-
-    // Return values needed by the component
-    return {
-        filteredDataProduct,  // The filtered data with highlights
-        handleSearch,         // Function to call when search changes
-        searchTerm,           // Current search term
-        expandedRowIds,       // Object with row IDs that should be expanded
-        // DEBUG: Add some debug helpers
-        debug: {
-            checkData: (data) => debugData(data, "Manual Debug"),
-            checkFiltered: () => debugData(filteredDataProduct, "Current Filtered Data")
-        }
+  // Memoized filter and highlight function
+  const filterAndHighlight = useMemo(() => (term, dataToFilter) => {
+    if (!term) {
+      setFilteredData(dataToFilter);
+      setExpandedRows({});
+      return;
+    }
+    
+    const termLower = term.toLowerCase();
+    const expandedState = {};
+    
+    // Deep clone to avoid mutating original data
+    const result = JSON.parse(JSON.stringify(dataToFilter));
+    
+    // Helper function to track expanded state when matches are found in children
+    const trackExpanded = (rowId, level, index) => {
+      if (level === 0) {
+        expandedState[`${index}-${rowId}`] = true;
+      } else if (level === 1) {
+        // For second level, we need parent's expanded state
+        expandedState[`${index}-${rowId}`] = true;
+      }
     };
+    
+    // Process data through all three levels with highlighting
+    const processNestedData = (items, level = 0, parentIndex = null) => {
+      if (!items || !Array.isArray(items)) return [];
+      
+      return items.filter((item, index) => {
+        // Check if current item matches search
+        let matchesCurrentItem = false;
+        
+        // Apply highlighting to matched fields and check for matches
+        searchFields.forEach(field => {
+          if (item[field] && String(item[field]).toLowerCase().includes(termLower)) {
+            matchesCurrentItem = true;
+            // Highlight the matching text
+            item[field] = highlightText(String(item[field]), term);
+          }
+        });
+        
+        // First level of nesting (subRows)
+        if (item.subRows && Array.isArray(item.subRows)) {
+          item.subRows = processNestedData(item.subRows, level + 1, index);
+          
+          // If any first-level children match, expand this row
+          if (item.subRows.length > 0 && !matchesCurrentItem) {
+            trackExpanded(item.id, level, index);
+          }
+        }
+        
+        // Check deeper level - second level of nesting (subRows within subRows)
+        // This handles the third level of depth
+        let hasMatchingGrandchild = false;
+        if (item.subRows && item.subRows.length > 0) {
+          for (const subItem of item.subRows) {
+            if (subItem.subRows && Array.isArray(subItem.subRows)) {
+              subItem.subRows = processNestedData(subItem.subRows, level + 2, index);
+              
+              // If any second-level children match, we need to expand both levels
+              if (subItem.subRows.length > 0) {
+                hasMatchingGrandchild = true;
+                // Track expansion for both the child and parent
+                if (level === 0) {
+                  trackExpanded(item.id, level, index);
+                  trackExpanded(subItem.id, level + 1, index);
+                }
+              }
+            }
+          }
+        }
+        
+        // Keep this item if it matches OR if any children/grandchildren match
+        return matchesCurrentItem || 
+               (item.subRows && item.subRows.length > 0) || 
+               hasMatchingGrandchild;
+      });
+    };
+    
+    const processed = processNestedData(result);
+    setFilteredData(processed);
+    setExpandedRows(expandedState);
+  }, [searchFields, highlightText]);
+
+  // Handle search term changes
+  const handleSearch = useCallback((term) => {
+    setSearchTerm(term);
+    filterAndHighlight(term, data);
+  }, [data, filterAndHighlight]);
+
+  return { 
+    filteredDataProduct: filteredData, 
+    handleSearch, 
+    searchTerm,
+    expandedRowIds: expandedRows
+  };
 };
 
 export default useNestedDataFilter;
