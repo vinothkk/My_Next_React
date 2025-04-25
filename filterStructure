@@ -1,43 +1,45 @@
 const filterStructure = (items) => {
     if (!items || !Array.isArray(items)) return [];
 
-    return items
-        .map(item => {
-            const itemCopy = { ...item };
+    return items.reduce((acc, item) => {
+        const itemPath = uniquePathsMap.get(item);
+        const itemCopy = { ...item };
 
-            // Check if current item matches
-            const directMatch = searchFields.some(field =>
-                item[field] && String(item[field]).toLowerCase().includes(termLower)
-            );
+        // Check if current item matches
+        const directMatch = searchFields.some(field =>
+            item[field] && String(item[field]).toLowerCase().includes(termLower)
+        );
 
-            // Process subRows recursively
-            let filteredSubRows = [];
-            if (item.subRows && Array.isArray(item.subRows)) {
-                filteredSubRows = filterStructure(item.subRows);
+        // Recurse into subRows
+        let filteredSubRows = [];
+        if (item.subRows && Array.isArray(item.subRows)) {
+            filteredSubRows = filterStructure(item.subRows);
+        }
+
+        const hasMatchingSubRow = filteredSubRows.length > 0;
+        const isMatch = directMatch || hasMatchingSubRow;
+
+        if (isMatch) {
+            // Highlight matching fields
+            if (directMatch) {
+                searchFields.forEach(field => {
+                    if (itemCopy[field]) {
+                        itemCopy[field] = highlightText(String(item[field]), term);
+                    }
+                });
             }
 
-            const hasMatchingSubRow = filteredSubRows.length > 0;
-            const matches = directMatch || hasMatchingSubRow;
+            // Assign only matching subRows
+            itemCopy.subRows = filteredSubRows;
 
-            if (!matches) return null;
-
-            // Highlight this item's fields if needed
-            searchFields.forEach(field => {
-                if (itemCopy[field]) {
-                    itemCopy[field] = highlightText(String(item[field]), term);
-                }
-            });
-
-            // Attach filtered subRows if any
-            if (hasMatchingSubRow) {
-                itemCopy.subRows = filteredSubRows;
-
-                // Expand this row in MRT
-                const itemPath = uniquePathsMap.get(item);
-                if (itemPath) expanded[itemPath] = true;
+            // Mark for expansion if it has sub matches
+            if (hasMatchingSubRow && itemPath) {
+                expanded[itemPath] = true;
             }
 
-            return itemCopy;
-        })
-        .filter(Boolean); // Remove nulls
+            acc.push(itemCopy);
+        }
+
+        return acc;
+    }, []);
 };
