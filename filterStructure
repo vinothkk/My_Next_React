@@ -1,39 +1,34 @@
-const processNestedData = (items, level = 0, parentIndex = null) => {
-  if (!items || !Array.isArray(items)) return [];
+const getExpandedData = (data) => {
+  let flatData = [];
 
-  return items
-    .map((item, index) => {
-      let matchesCurrentItem = false;
-      const newItem = { ...item }; // Create shallow copy to avoid mutation
+  data.forEach(item => {
+    // Add parent item (remove subRow reference if present)
+    const parentItem = { ...item };
+    delete parentItem.subRow;
+    flatData.push(parentItem);
 
-      // Highlight and check match
-      searchFields.forEach(field => {
-        if (newItem[field] && String(newItem[field]).toLowerCase().includes(termLower)) {
-          matchesCurrentItem = true;
-          newItem[field] = highlightText(String(newItem[field]), term);
+    // Process first level children
+    if (item.subRow && Array.isArray(item.subRow)) {
+      item.subRow.forEach(child => {
+        const childItem = { ...child, parentReference: item.id };
+        delete childItem.subRow; // important: remove subRow from child
+        flatData.push(childItem);
+
+        // Process second level children
+        if (child.subRow && Array.isArray(child.subRow)) {
+          child.subRow.forEach(grandchild => {
+            const grandchildItem = { 
+              ...grandchild, 
+              parentReference: child.id,
+              grandparentReference: item.id 
+            };
+            delete grandchildItem.subRow; // important: remove subRow from grandchild
+            flatData.push(grandchildItem);
+          });
         }
       });
+    }
+  });
 
-      // Process subRows recursively (1st level)
-      let filteredSubRows = [];
-      if (Array.isArray(newItem.subRows)) {
-        filteredSubRows = processNestedData(newItem.subRows, level + 1, index);
-      }
-
-      // Only include subRows if they matched
-      if (filteredSubRows.length > 0) {
-        newItem.subRows = filteredSubRows;
-        trackExpanded(newItem.id, level, index);
-      } else {
-        delete newItem.subRows; // Remove subRows if empty
-      }
-
-      // Include row only if it or its children matched
-      if (matchesCurrentItem || filteredSubRows.length > 0) {
-        return newItem;
-      }
-
-      return null; // Otherwise, filter it out
-    })
-    .filter(Boolean); // Remove nulls
+  return flatData;
 };
