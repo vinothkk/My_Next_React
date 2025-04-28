@@ -1,3 +1,72 @@
+Manual Expand
+=================================================
+  const handleExpandChange = useCallback(async (updaterOrValue) => {
+  let newExpanded;
+  if (typeof updaterOrValue === 'function') {
+    newExpanded = updaterOrValue(manualExpanded);
+  } else {
+    newExpanded = updaterOrValue;
+  }
+
+  // Update manual expanded state
+  setManualExpanded(newExpanded);
+
+  // Loop over expanded rows
+  for (const [rowId, isExpanded] of Object.entries(newExpanded)) {
+    if (isExpanded) {
+      const subRowId = rowId; // This is the id we get
+
+      // Find the object inside tableData manually
+      const findRowById = (rows) => {
+        for (const row of rows) {
+          if (row.id?.toString() === subRowId?.toString()) {
+            return row;
+          }
+          if (row.subRows && row.subRows.length > 0) {
+            const found = findRowById(row.subRows);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const foundRow = findRowById(tableData);
+
+      if (foundRow) {
+        // Check if detailData is missing or empty
+        if (!foundRow.detailData || foundRow.detailData.length === 0) {
+          try {
+            const additionalData = await fetchAdditionalData(subRowId);
+
+            setTableData(prevData => {
+              const newData = structuredClone(prevData);
+
+              const updateRowById = (rows) => {
+                for (const row of rows) {
+                  if (row.id?.toString() === subRowId?.toString()) {
+                    row.detailData = additionalData;
+                  }
+                  if (row.subRows && row.subRows.length > 0) {
+                    updateRowById(row.subRows);
+                  }
+                }
+              };
+
+              updateRowById(newData);
+              return newData;
+            });
+          } catch (error) {
+            console.error('Error while fetching additional data:', error);
+          }
+        }
+      } else {
+        console.warn('Row not found for rowId:', subRowId);
+      }
+    }
+  }
+}, [manualExpanded, tableData]);
+
+============================================
 ________________________________________________________________________________
 const handleExpandChange = async (updaterOrValue) => {
   let newExpanded;
