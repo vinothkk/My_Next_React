@@ -1,3 +1,113 @@
+// In your YourTableComponent
+const {
+  filteredDataProduct,
+  handleSearch,
+  searchTerm,
+  expandedRowIds
+} = useNestedDataFilter(productandServiceDataTableData, ['name']);
+
+// Add a useEffect to trigger data loading when expanded state changes due to search
+useEffect(() => {
+  // Load data for any newly expanded level 3 rows
+  const loadDataForExpandedRows = async () => {
+    if (!expandedRowIds) return;
+    
+    // Find level 3 rows that need data loaded
+    const findAndLoadLevel3Rows = (rows, depth = 0) => {
+      for (const row of rows) {
+        const isExpanded = expandedRowIds[row.id];
+        
+        // If this is an expanded level 2 row
+        if (isExpanded && depth === 1 && row.subRows) {
+          // Check its children (level 3 rows) that need data
+          for (const subRow of row.subRows) {
+            if (expandedRowIds[subRow.id] && 
+                subRow.hasOwnProperty('detailData') && 
+                (!subRow.detailData || subRow.detailData.length === 0)) {
+              // Fetch and load data for this row
+              fetchAdditionalData(subRow.id).then(data => {
+                // Update the data in state
+                setProductandServiceDataTableData(prevData => {
+                  // Create a deep copy
+                  const newData = JSON.parse(JSON.stringify(prevData));
+                  
+                  // Find and update the specific row
+                  const updateRow = (rows, targetId) => {
+                    for (let i = 0; i < rows.length; i++) {
+                      if (rows[i].id === targetId) {
+                        rows[i].detailData = data;
+                        return true;
+                      }
+                      
+                      if (rows[i].subRows && rows[i].subRows.length > 0) {
+                        if (updateRow(rows[i].subRows, targetId)) {
+                          return true;
+                        }
+                      }
+                    }
+                    return false;
+                  };
+                  
+                  updateRow(newData, subRow.id);
+                  return newData;
+                });
+              });
+            }
+          }
+        }
+        
+        // Recursively check subrows
+        if (row.subRows && row.subRows.length > 0) {
+          findAndLoadLevel3Rows(row.subRows, depth + 1);
+        }
+      }
+    };
+    
+    findAndLoadLevel3Rows(filteredDataProduct);
+  };
+  
+  loadDataForExpandedRows();
+}, [expandedRowIds, filteredDataProduct]);
+
+// In your return statement, make sure to pass expanded state to the table
+return (
+  <MaterialReactTable
+    columns={columns}
+    data={filteredDataProduct}
+    enableExpanding
+    getSubRows={(row) => row.subRows || []}
+    renderDetailPanel={renderDetailPanel}
+    onExpandedChange={(updater) => {
+      // Handle manual expansion changes
+      const newExpandedState = typeof updater === 'function' 
+        ? updater(expandedRowIds) 
+        : updater;
+      
+      // Preserve current search-expanded rows
+      const combinedState = {...expandedRowIds, ...newExpandedState};
+      
+      // Your existing manual expand handler, if any
+      if (setManualExpanded) {
+        setManualExpanded(combinedState);
+      }
+      
+      // Your existing fetch data logic for manually expanded rows
+      // ... (can be placed here)
+    }}
+    tableInstanceRef={tableInstanceRef}
+    muiSearchTextFieldProps={{
+      placeholder: 'Search all records...',
+      variant: 'outlined',
+      onChange: (e) => handleSearch(e.target.value),
+      value: searchTerm,
+    }}
+    state={{
+      expanded: expandedRowIds,  // Use expanded state from your hook
+      isLoading,
+    }}
+  />
+);
+===================================================================================
 const YourTableComponent = () => {
   // Keep your existing state
   const [productandServiceDataTableData, setProductandServiceDataTableData] = useState([]);
