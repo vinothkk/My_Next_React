@@ -1,3 +1,132 @@
+=========================================================================================
+  import React, { useState, useRef, useCallback } from 'react';
+import MaterialReactTable from 'material-react-table';
+
+const YourTableComponent = ({ productandServiceDataTableData }) => {
+  const [tableData, setTableData] = useState(productandServiceDataTableData || []);
+  const [manualExpanded, setManualExpanded] = useState({}); // ✅ manual expanded control
+  const [isLoading, setIsLoading] = useState(false);
+  const tableInstanceRef = useRef(null);
+
+  const fetchAdditionalData = async (subrowId) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/details/${subrowId}`);
+      const additionalData = await response.json();
+      return additionalData;
+    } catch (error) {
+      console.error('Error fetching additional data:', error);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExpandChange = useCallback(async (updaterOrValue) => {
+    // Handle if MaterialReactTable sends a function or object
+    let newExpanded;
+    if (typeof updaterOrValue === 'function') {
+      newExpanded = updaterOrValue(manualExpanded);
+    } else {
+      newExpanded = updaterOrValue;
+    }
+
+    // update manual expanded state
+    setManualExpanded(newExpanded);
+
+    // Loop over expanded rows
+    for (const [rowId, isExpanded] of Object.entries(newExpanded)) {
+      if (isExpanded) {
+        const row = tableInstanceRef.current?.getRow(rowId);
+
+        if (row && row.depth === 2) { // 3rd level expansion
+          const subrowId = row.original.id;
+          const parentId = row.original.parentId;
+
+          // Check if already loaded
+          if (!row.original.detailData || row.original.detailData.length === 0) {
+            const additionalData = await fetchAdditionalData(subrowId);
+
+            setTableData(prevData => {
+              const newData = structuredClone(prevData);
+
+              const updateRows = (rows) => {
+                for (let r of rows) {
+                  if (r.subRows) updateRows(r.subRows);
+                  if (r.id === parentId) {
+                    const targetRow = r.subRows.find(sr => sr.id === subrowId);
+                    if (targetRow) {
+                      targetRow.detailData = additionalData;
+                    }
+                  }
+                }
+              };
+              updateRows(newData);
+              return newData;
+            });
+          }
+        }
+      }
+    }
+  }, [manualExpanded, tableData]);
+
+  const renderDetailPanel = useCallback(({ row }) => {
+    if (row.depth !== 2) return null; // Only show for 3rd level rows
+
+    const subrowData = row.original;
+
+    return (
+      <div style={{ padding: '1rem' }}>
+        {isLoading ? (
+          <div>Loading additional details...</div>
+        ) : subrowData.detailData && subrowData.detailData.length > 0 ? (
+          subrowData.detailData.map((item, idx) => (
+            <pre key={idx} style={{ marginBottom: '0.5rem' }}>
+              {JSON.stringify(item, null, 2)}
+            </pre>
+          ))
+        ) : (
+          <div>No detail data available</div>
+        )}
+      </div>
+    );
+  }, [isLoading]);
+
+  const columns = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+    },
+    {
+      accessorKey: 'id',
+      header: 'ID',
+    },
+    // your other columns if needed
+  ];
+
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={tableData}
+      getSubRows={(row) => row.subRows || []}
+      renderDetailPanel={renderDetailPanel}
+      onExpandedChange={handleExpandChange}
+      state={{
+        expanded: manualExpanded, // ✅ control expanded state manually
+        isLoading,
+      }}
+      tableInstanceRef={tableInstanceRef}
+      muiSearchTextFieldProps={{
+        placeholder: 'Search all records...',
+        variant: 'outlined',
+      }}
+    />
+  );
+};
+
+export default YourTableComponent;
+
+===============================================================================================
 import React, { useState, useRef, useCallback } from 'react';
 import MaterialReactTable from 'material-react-table';
 
