@@ -1,3 +1,144 @@
+
+++++++++++++++++++++++++++++++++++++++++++++++28 Apirl 2025+++++++++++++++++=
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { MaterialReactTable } from 'material-react-table';
+
+const YourTableComponent = () => {
+  const [tableData, setTableData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [expandedDetailPanel, setExpandedDetailPanel] = useState({});
+  
+  // Function to fetch additional data for a specific subrow
+  const fetchAdditionalData = async (subrowId) => {
+    setIsLoading(true);
+    try {
+      // Replace with your actual API call
+      const response = await fetch(`/api/details/${subrowId}`);
+      const additionalData = await response.json();
+      return additionalData;
+    } catch (error) {
+      console.error('Error fetching additional data:', error);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Function to update the subrow's detailData
+  const updateSubrowData = useCallback(async (rowId, subrowId) => {
+    // Get the additional data
+    const additionalData = await fetchAdditionalData(subrowId);
+    
+    // Update the table data with the new information
+    setTableData(prevData => {
+      const newData = JSON.parse(JSON.stringify(prevData)); // Deep clone
+      const rowIndex = newData.findIndex(row => row.id === rowId);
+      
+      if (rowIndex === -1) return prevData;
+      
+      const subrowIndex = newData[rowIndex].subrows.findIndex(
+        subrow => subrow.id === subrowId
+      );
+      
+      if (subrowIndex === -1) return prevData;
+      
+      // Update detailData with the new data
+      newData[rowIndex].subrows[subrowIndex].detailData = additionalData;
+      return newData;
+    });
+  }, []);
+  
+  // Effect to load data when a detail panel is expanded
+  useEffect(() => {
+    const { rowId, subrowId } = expandedDetailPanel;
+    if (rowId && subrowId) {
+      // Find the row and check if detailData needs to be loaded
+      const row = tableData.find(r => r.id === rowId);
+      if (row) {
+        const subrow = row.subrows.find(sr => sr.id === subrowId);
+        if (subrow && (!subrow.detailData || subrow.detailData.length === 0)) {
+          updateSubrowData(rowId, subrowId);
+        }
+      }
+    }
+  }, [expandedDetailPanel, tableData, updateSubrowData]);
+  
+  // Custom renderDetailPanel function
+  const renderDetailPanel = useCallback(({ row }) => {
+    // Check if this is a subrow (by checking if it has a parent row)
+    const isSubrow = row.depth === 1;
+    
+    if (isSubrow) {
+      // For subrows, handle detail panel differently
+      const subrowData = row.original;
+      const parentRowId = row.parentId;
+      const subrowId = subrowData.id;
+      
+      // Set the current expanded panel - do this in a useEffect to avoid the render error
+      setTimeout(() => {
+        setExpandedDetailPanel({ rowId: parentRowId, subrowId });
+      }, 0);
+      
+      // Show the detail content
+      return (
+        <div className="detail-panel">
+          {!subrowData.detailData || subrowData.detailData.length === 0 ? (
+            <div>Loading additional details...</div>
+          ) : (
+            <div>
+              {/* Render the detailData content here */}
+              {Array.isArray(subrowData.detailData) ? (
+                <ul>
+                  {subrowData.detailData.map((item, index) => (
+                    <li key={index}>{JSON.stringify(item)}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div>No detail data available</div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // Handle regular row detail panels if needed
+    return null;
+  }, []);
+  
+  const columns = [
+    // Your column definitions
+  ];
+  
+  const handleSearch = (value) => {
+    // Your search logic
+  };
+  
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={tableData}
+      enableFilters={true}
+      enableExpandAll={false}
+      enableExpanding={true}
+      initialState={{ showGlobalFilter: true }}
+      onGlobalFilterChange={handleSearch}
+      getSubRows={row => row.subrows || []}
+      renderDetailPanel={renderDetailPanel}
+      muiSearchTextFieldProps={{
+        placeholder: 'Search all records...',
+        variant: 'outlined',
+      }}
+      state={{
+        isLoading,
+      }}
+    />
+  );
+};
+
+export default YourTableComponent;
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { MaterialReactTable } from 'material-react-table';
 
