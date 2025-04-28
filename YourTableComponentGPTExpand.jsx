@@ -1,3 +1,150 @@
+const YourTableComponent = () => {
+  // Keep your existing state
+  const [productandServiceDataTableData, setProductandServiceDataTableData] = useState([]);
+  const [manualExpanded, setManualExpanded] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const tableInstanceRef = useRef(null);
+  
+  // Function to fetch additional data for a specific subrow
+  const fetchAdditionalData = async (subrowId) => {
+    setIsLoading(true);
+    try {
+      // Replace with your actual API call
+      const response = await fetch(`/api/details/${subrowId}`);
+      const additionalData = await response.json();
+      return additionalData;
+    } catch (error) {
+      console.error('Error fetching additional data:', error);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Combined handler for both your existing expand functionality and the new dynamic loading
+  const handleExpandRow = useCallback(async (updater) => {
+    // MaterialReactTable passes either an object or a function updater
+    // We need to handle both cases
+    
+    // First, determine what the new expanded state will be
+    let newExpandedState;
+    if (typeof updater === 'function') {
+      // If it's a function updater, we need to call it with the current state
+      newExpandedState = updater(manualExpanded);
+    } else {
+      // If it's an object, that's the new state directly
+      newExpandedState = updater;
+    }
+    
+    // Find which row was newly expanded by comparing with previous state
+    let expandedRowId = null;
+    let isExpanded = false;
+    
+    // The updater might be an object with a rowId and expanded properties
+    if (updater && typeof updater === 'object' && 'id' in updater) {
+      expandedRowId = updater.id;
+      isExpanded = updater.expanded;
+    } 
+    // Or we need to find which row changed in the expanded state object
+    else if (newExpandedState && typeof newExpandedState === 'object') {
+      for (const id in newExpandedState) {
+        if (newExpandedState[id] && (!manualExpanded || !manualExpanded[id])) {
+          expandedRowId = id;
+          isExpanded = true;
+          break;
+        }
+      }
+    }
+    
+    // First, call your existing handler to maintain current functionality
+    setManualExpanded(newExpandedState);
+    
+    // If no row was expanded or the row was collapsed, we don't need to fetch data
+    if (!expandedRowId || !isExpanded) return;
+    
+    console.log('Row expanded:', expandedRowId);
+    
+    // Find the row data for the expanded row
+    const findRow = (rows, id, depth = 0) => {
+      for (const row of rows) {
+        if (row.id === id) {
+          return { row, depth };
+        }
+        
+        if (row.subRows && row.subRows.length > 0) {
+          const found = findRow(row.subRows, id, depth + 1);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const rowInfo = findRow(productandServiceDataTableData, expandedRowId);
+    if (!rowInfo) return;
+    
+    const { row, depth } = rowInfo;
+    
+    // Check if this is a level-3 row with detailData property that needs loading
+    const isLevel3 = depth === 2; // Adjust based on your actual structure
+    const needsDataLoading = isLevel3 && 
+                           row.hasOwnProperty('detailData') && 
+                           (!row.detailData || row.detailData.length === 0);
+    
+    if (needsDataLoading) {
+      console.log('Loading data for row:', row.id);
+      
+      // Fetch the data
+      const additionalData = await fetchAdditionalData(row.id);
+      
+      // Update the state with the new data
+      setProductandServiceDataTableData(prevData => {
+        // Create a deep copy to avoid mutating state
+        const newData = JSON.parse(JSON.stringify(prevData));
+        
+        // Find and update the specific row in the nested structure
+        const updateRowInData = (rows, targetId) => {
+          for (let i = 0; i < rows.length; i++) {
+            if (rows[i].id === targetId) {
+              rows[i].detailData = additionalData;
+              return true;
+            }
+            
+            if (rows[i].subRows && rows[i].subRows.length > 0) {
+              if (updateRowInData(rows[i].subRows, targetId)) {
+                return true;
+              }
+            }
+          }
+          return false;
+        };
+        
+        updateRowInData(newData, row.id);
+        return newData;
+      });
+    }
+  }, [manualExpanded, productandServiceDataTableData]);
+  
+  // The rest of your component remains the same
+  
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={productandServiceDataTableData}
+      enableExpanding
+      getSubRows={(row) => row.subRows || []}
+      renderDetailPanel={renderDetailPanel}
+      onExpandedChange={handleExpandRow}
+      tableInstanceRef={tableInstanceRef}
+      muiSearchTextFieldProps={{
+        placeholder: 'Search all records...',
+        variant: 'outlined',
+      }}
+      state={{
+        isLoading,
+      }}
+    />
+  );
+};
 ===================================================================================
   const YourTableComponent = () => {
   // Keep your existing state
