@@ -1,3 +1,61 @@
+________________________________________________________________________________
+const handleExpandChange = async (updaterOrValue) => {
+  let newExpanded;
+  if (typeof updaterOrValue === 'function') {
+    newExpanded = updaterOrValue(manualExpanded);
+  } else {
+    newExpanded = updaterOrValue;
+  }
+
+  setManualExpanded(newExpanded);
+
+  // Instead of fetching based on rowId -> loop over tableData
+  for (const [rowId, isExpanded] of Object.entries(newExpanded)) {
+    if (isExpanded) {
+      // Find the subRow manually from tableData
+      const findSubRow = (rows) => {
+        for (const row of rows) {
+          if (row.id?.toString() === rowId) return row;
+          if (row.subRows) {
+            const found = findSubRow(row.subRows);
+            if (found) return found;
+          }
+        }
+        return undefined;
+      };
+
+      const row = findSubRow(tableData);
+
+      console.log('found row:', row);
+
+      if (row && row.depth === 2) {
+        const subrowId = row.id;
+
+        if (!row.detailData || row.detailData.length === 0) {
+          const additionalData = await fetchAdditionalData(subrowId);
+
+          setTableData(prev => {
+            const newData = structuredClone(prev);
+
+            const updateRow = (rows) => {
+              for (let r of rows) {
+                if (r.id?.toString() === rowId) {
+                  r.detailData = additionalData;
+                }
+                if (r.subRows) {
+                  updateRow(r.subRows);
+                }
+              }
+            };
+            updateRow(newData);
+            return newData;
+          });
+        }
+      }
+    }
+  }
+};
+
 =========================================================================================
   import React, { useState, useRef, useCallback } from 'react';
 import MaterialReactTable from 'material-react-table';
