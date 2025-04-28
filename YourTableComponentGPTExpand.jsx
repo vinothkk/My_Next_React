@@ -1,3 +1,158 @@
+===================================================================================
+  const YourTableComponent = () => {
+  // Keep your existing state
+  const [productandServiceDataTableData, setProductandServiceDataTableData] = useState([]);
+  const [manualExpanded, setManualExpanded] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const tableInstanceRef = useRef(null);
+  
+  // Function to fetch additional data for a specific subrow
+  const fetchAdditionalData = async (subrowId) => {
+    setIsLoading(true);
+    try {
+      // Replace with your actual API call
+      const response = await fetch(`/api/details/${subrowId}`);
+      const additionalData = await response.json();
+      return additionalData;
+    } catch (error) {
+      console.error('Error fetching additional data:', error);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Combined handler for both your existing expand functionality and the new dynamic loading
+  const handleExpandRow = useCallback(async (expandedState) => {
+    // First, call your existing handler to maintain current functionality
+    setManualExpanded(expandedState);
+    
+    // Find which row was just expanded (if any)
+    const newlyExpandedRowId = Object.keys(expandedState).find(
+      key => expandedState[key] && !manualExpanded[key]
+    );
+    
+    if (!newlyExpandedRowId) return; // No newly expanded row
+    
+    // Find the row data for the expanded row
+    const findRowById = (rows, id, parentPath = []) => {
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const currentPath = [...parentPath, i];
+        
+        if (row.id === id) {
+          return { row, path: currentPath };
+        }
+        
+        if (row.subRows && row.subRows.length > 0) {
+          const result = findRowById(row.subRows, id, [...currentPath, 'subRows']);
+          if (result) return result;
+        }
+      }
+      return null;
+    };
+    
+    const rowData = findRowById(productandServiceDataTableData, newlyExpandedRowId);
+    if (!rowData) return;
+    
+    const { row, path } = rowData;
+    
+    // Check if this is a level-3 row with detailData property that needs loading
+    const isLevel3 = path.length === 5; // Adjust based on your actual structure
+    const needsDataLoading = isLevel3 && row.hasOwnProperty('detailData') && 
+                            (!row.detailData || row.detailData.length === 0);
+    
+    if (needsDataLoading) {
+      // Fetch the data
+      const additionalData = await fetchAdditionalData(row.id);
+      
+      // Update the table data with the fetched details
+      setProductandServiceDataTableData(prevData => {
+        // Create a deep copy to avoid mutating state directly
+        const newData = JSON.parse(JSON.stringify(prevData));
+        
+        // Navigate to the correct nested position using the path we found
+        let target = newData;
+        let currentPath = [];
+        
+        for (let i = 0; i < path.length - 1; i++) {
+          currentPath.push(path[i]);
+          target = target[path[i]];
+          if (path[i+1] === 'subRows') {
+            target = target.subRows;
+            i++;
+          }
+        }
+        
+        // Update the detailData property
+        target[path[path.length - 1]].detailData = additionalData;
+        return newData;
+      });
+    }
+  }, [manualExpanded, productandServiceDataTableData]);
+  
+  // Custom renderDetailPanel function - similar to your example
+  const renderDetailPanel = useCallback(({ row }) => {
+    // Determine if this is a level-3 row
+    const isLevel3Row = row.depth === 2; // Adjust based on your actual structure
+    
+    if (isLevel3Row && row.original.hasOwnProperty('detailData')) {
+      const rowData = row.original;
+      
+      return (
+        <div>
+          {!rowData.detailData || rowData.detailData.length === 0 ? (
+            <div>Loading additional details...</div>
+          ) : (
+            <div>
+              {/* Render your detail data here */}
+              {Array.isArray(rowData.detailData) ? (
+                <div>
+                  {rowData.detailData.map((item, index) => (
+                    <div key={index}>
+                      <div>Customer ID: {item.customerId}</div>
+                      <div>Product Family: {item.product_family}</div>
+                      <div>Business Unit: {item.business_unit}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>No detail data available</div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    return null;
+  }, []);
+  
+  // Your columns definition
+  const columns = [
+    // Your column definitions
+  ];
+  
+  return (
+    <MaterialReactTable
+      columns={columns}
+      data={productandServiceDataTableData}
+      enableExpanding
+      getSubRows={(row) => row.subRows || []}
+      renderDetailPanel={renderDetailPanel}
+      onExpandedChange={handleExpandRow}
+      tableInstanceRef={tableInstanceRef}
+      muiSearchTextFieldProps={{
+        placeholder: 'Search all records...',
+        variant: 'outlined',
+      }}
+      state={{
+        isLoading,
+      }}
+    />
+  );
+};
+=====================================================================================
 Manual expand 3
 const handleExpandChange = useCallback(async (updaterOrValue) => {
   let newExpanded;
