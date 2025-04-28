@@ -1,4 +1,171 @@
+================================================================================== Apr 28 second Freeze issue
+import React, { useState, useCallback, useMemo } from 'react';
 
+// Custom Hook: useNestedDataFilter
+const useNestedDataFilter = (initialData, searchFields = ['name']) => {
+    // Store the current search term
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Simple, non-recursive highlighting function
+    const highlightText = useCallback((text, term) => {
+        if (!term || !text) return text;
+        
+        // Convert to string and trim for safety
+        const textStr = String(text);
+        const termLower = term.toLowerCase();
+        
+        // Simple indexOf check instead of regex for better performance
+        const index = textStr.toLowerCase().indexOf(termLower);
+        if (index === -1) return textStr;
+        
+        // Basic split for highlighting - just highlight the first occurrence
+        return [
+            textStr.substring(0, index),
+            <mark key="highlight">{textStr.substring(index, index + term.length)}</mark>,
+            textStr.substring(index + term.length)
+        ];
+    }, []);
+
+    // Non-recursive flattening method to find all matching items
+    const findAllMatches = useCallback((data, term) => {
+        if (!term || !data) return { matches: new Set(), paths: new Map() };
+        
+        const termLower = term.toLowerCase();
+        const matches = new Set(); // Store IDs of matched items
+        const paths = new Map();   // Store paths to each item for expansion
+        
+        // Queue for breadth-first traversal (avoids recursion stack issues)
+        const queue = [];
+        
+        // Initialize queue with top-level items
+        data.forEach(item => {
+            if (item && item.id) {
+                queue.push({ item, parentPath: [] });
+            }
+        });
+        
+        // Process items in breadth-first manner
+        while (queue.length > 0) {
+            const { item, parentPath } = queue.shift();
+            
+            // Store the path to this item
+            const currentPath = [...parentPath, item.id];
+            paths.set(item.id, currentPath);
+            
+            // Check if this item matches
+            const itemMatches = searchFields.some(field => {
+                if (!item[field]) return false;
+                return String(item[field]).toLowerCase().includes(termLower);
+            });
+            
+            if (itemMatches) {
+                matches.add(item.id);
+                
+                // Add all parents to matches for expansion
+                parentPath.forEach(parentId => matches.add(parentId));
+            }
+            
+            // Add children to queue
+            if (item.subRows && Array.isArray(item.subRows)) {
+                item.subRows.forEach(subItem => {
+                    if (subItem && subItem.id) {
+                        queue.push({ 
+                            item: subItem, 
+                            parentPath: currentPath 
+                        });
+                    }
+                });
+            }
+        }
+        
+        return { matches, paths };
+    }, [searchFields]);
+
+    // Non-recursive filtering function using the matches
+    const applyFiltering = useCallback((data, matches, term) => {
+        if (!term || matches.size === 0) return data;
+        
+        // Function to process a single level of items
+        const processLevel = (items) => {
+            if (!items || !Array.isArray(items)) return [];
+            
+            return items
+                // Keep only items that match or have matching descendants
+                .filter(item => item && item.id && matches.has(item.id))
+                .map(item => {
+                    // Create a new item to avoid mutation
+                    const newItem = { ...item };
+                    
+                    // Apply highlighting to relevant fields
+                    searchFields.forEach(field => {
+                        if (newItem[field]) {
+                            newItem[field] = highlightText(newItem[field], term);
+                        }
+                    });
+                    
+                    // Process subRows if they exist
+                    if (item.subRows && Array.isArray(item.subRows)) {
+                        newItem.subRows = processLevel(item.subRows);
+                    }
+                    
+                    return newItem;
+                });
+        };
+        
+        return processLevel(data);
+    }, [searchFields, highlightText]);
+
+    // Main filtering logic - using non-recursive approach
+    const getFilteredData = useCallback((data, term) => {
+        if (!term || !term.trim()) {
+            return { filtered: data, expanded: {} };
+        }
+        
+        // First pass: Find all matches and build expansion paths
+        const { matches, paths } = findAllMatches(data, term);
+        
+        // If no matches, return empty result
+        if (matches.size === 0) {
+            return { filtered: [], expanded: {} };
+        }
+        
+        // Second pass: Apply filtering and highlighting
+        const filtered = applyFiltering(data, matches, term);
+        
+        // Build expanded state object from matches
+        const expanded = {};
+        matches.forEach(id => {
+            expanded[id] = true;
+        });
+        
+        return { filtered, expanded };
+    }, [findAllMatches, applyFiltering]);
+
+    // Memoize the filtered data
+    const result = useMemo(() => {
+        // Debounce by only filtering if search term is at least 2 chars
+        if (!searchTerm || searchTerm.length < 2) {
+            return { filtered: initialData, expanded: {} };
+        }
+        return getFilteredData(initialData, searchTerm);
+    }, [initialData, searchTerm, getFilteredData]);
+
+    // Handler to update the search term
+    const handleSearch = useCallback((term) => {
+        setSearchTerm(term);
+    }, []);
+
+    return {
+        filteredDataProduct: result.filtered,
+        handleSearch,
+        searchTerm,
+        expandedRowIds: result.expanded
+    };
+};
+
+export default useNestedDataFilter;
++++++++++++++++++++++++++++++++++++
+    
 New Code added ---Apr 28- 2025-------
 
     import React, { useState, useCallback, useMemo, useRef } from 'react';
