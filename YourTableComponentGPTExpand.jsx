@@ -1,3 +1,78 @@
+manual expand 2
+const handleExpandChange = useCallback(async (updaterOrValue) => {
+  let newExpanded;
+  if (typeof updaterOrValue === 'function') {
+    newExpanded = updaterOrValue(manualExpanded);
+  } else {
+    newExpanded = updaterOrValue;
+  }
+
+  setManualExpanded(newExpanded);
+
+  // Find the last expanded row (only check newly expanded row)
+  const expandedRowIds = Object.entries(newExpanded)
+    .filter(([_, isExpanded]) => isExpanded)
+    .map(([rowId, _]) => rowId);
+
+  if (expandedRowIds.length === 0) {
+    return; // nothing expanded
+  }
+
+  const lastExpandedRowId = expandedRowIds[expandedRowIds.length - 1];
+
+  // Find the object inside tableData manually
+  const findRowById = (rows) => {
+    for (const row of rows) {
+      if (row.id?.toString() === lastExpandedRowId?.toString()) {
+        return row;
+      }
+      if (row.subRows && row.subRows.length > 0) {
+        const found = findRowById(row.subRows);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const foundRow = findRowById(tableData);
+
+  if (foundRow) {
+    // Check if 'detailData' property exists and is empty
+    if (Object.prototype.hasOwnProperty.call(foundRow, 'detailData') && 
+        (!foundRow.detailData || foundRow.detailData.length === 0)) {
+      
+      try {
+        const additionalData = await fetchAdditionalData(lastExpandedRowId);
+
+        setTableData(prevData => {
+          const newData = structuredClone(prevData);
+
+          const updateRowById = (rows) => {
+            for (const row of rows) {
+              if (row.id?.toString() === lastExpandedRowId?.toString()) {
+                row.detailData = additionalData;
+              }
+              if (row.subRows && row.subRows.length > 0) {
+                updateRowById(row.subRows);
+              }
+            }
+          };
+
+          updateRowById(newData);
+          return newData;
+        });
+      } catch (error) {
+        console.error('Error fetching additional data:', error);
+      }
+    } else {
+      console.log('Detail data already loaded or no detailData field present');
+    }
+  } else {
+    console.warn('Row not found for rowId:', lastExpandedRowId);
+  }
+}, [manualExpanded, tableData]);
+
+============================
 Manual Expand
 =================================================
   const handleExpandChange = useCallback(async (updaterOrValue) => {
