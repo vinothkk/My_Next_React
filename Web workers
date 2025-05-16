@@ -1,3 +1,17 @@
+// apiWorker.js
+import axios from 'axios';
+
+self.onmessage = async (event) => {
+  const { url, payload } = event.data;
+
+  try {
+    const response = await axios.post(url, payload);
+    self.postMessage({ status: 'success', data: response.data });
+  } catch (error) {
+    self.postMessage({ status: 'error', error: error.message });
+  }
+};
+
 import React, { useEffect, useState } from 'react';
 import Worker from 'web-worker';
 
