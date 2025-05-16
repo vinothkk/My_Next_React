@@ -1,0 +1,38 @@
+import React, { useEffect, useState } from 'react';
+import Worker from 'web-worker';
+
+function App() {
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    const worker = new Worker(new URL('./apiWorker.js', import.meta.url));
+
+    worker.postMessage({
+      url: 'https://jsonplaceholder.typicode.com/posts',
+      payload: {
+        title: 'foo',
+        body: 'bar',
+        userId: 1,
+      },
+    });
+
+    worker.onmessage = (event) => {
+      if (event.data.status === 'success') {
+        setResult(event.data.data);
+      } else {
+        console.error('Worker error:', event.data.error);
+      }
+    };
+
+    return () => worker.terminate();
+  }, []);
+
+  return (
+    <div>
+      <h1>Web Worker API Result</h1>
+      <pre>{JSON.stringify(result, null, 2)}</pre>
+    </div>
+  );
+}
+
+export default App;
