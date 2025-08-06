@@ -154,4 +154,270 @@ Recommended DB access	✅ JdbcTemplate	Easier than JPA for multi-DB
 ---
 
 If you'd like, I can give you a working example with JdbcTemplate using all 3 databases. Let me know.
+Here’s a full working example of a Spring Boot application using JdbcTemplate to perform CRUD operations on MySQL, PostgreSQL, and Databricks (via JDBC).
+
+
+---
+
+✅ Project Structure
+
+springboot-multi-db-jdbctemplate/
+├── config/
+│   ├── MySQLConfig.java
+│   ├── PostgresConfig.java
+│   └── DatabricksConfig.java
+├── repository/
+│   ├── MySQLUserRepository.java
+│   ├── PostgresUserRepository.java
+│   └── DatabricksUserRepository.java
+├── controller/
+│   └── UserController.java
+├── model/
+│   └── User.java
+├── application.yml
+└── SpringbootMultiDbApplication.java
+
+
+---
+
+✅ 1. Model: User.java
+
+package com.example.model;
+
+public class User {
+    private int id;
+    private String name;
+    private String email;
+
+    // Getters and Setters
+}
+
+
+---
+
+✅ 2. Configuration Classes
+
+➤ MySQLConfig.java
+
+@Configuration
+@ConfigurationProperties(prefix = "mysql.datasource")
+public class MySQLConfig {
+
+    @Bean(name = "mysqlDataSource")
+    @Primary
+    public DataSource mysqlDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean(name = "mysqlJdbcTemplate")
+    public JdbcTemplate mysqlJdbcTemplate(@Qualifier("mysqlDataSource") DataSource ds) {
+        return new JdbcTemplate(ds);
+    }
+}
+
+➤ PostgresConfig.java
+
+@Configuration
+@ConfigurationProperties(prefix = "postgres.datasource")
+public class PostgresConfig {
+
+    @Bean(name = "postgresDataSource")
+    public DataSource postgresDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean(name = "postgresJdbcTemplate")
+    public JdbcTemplate postgresJdbcTemplate(@Qualifier("postgresDataSource") DataSource ds) {
+        return new JdbcTemplate(ds);
+    }
+}
+
+➤ DatabricksConfig.java
+
+@Configuration
+@ConfigurationProperties(prefix = "databricks.datasource")
+public class DatabricksConfig {
+
+    @Bean(name = "databricksDataSource")
+    public DataSource databricksDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean(name = "databricksJdbcTemplate")
+    public JdbcTemplate databricksJdbcTemplate(@Qualifier("databricksDataSource") DataSource ds) {
+        return new JdbcTemplate(ds);
+    }
+}
+
+
+---
+
+✅ 3. Repository Classes
+
+➤ MySQLUserRepository.java
+
+@Repository
+public class MySQLUserRepository {
+    @Autowired
+    @Qualifier("mysqlJdbcTemplate")
+    private JdbcTemplate jdbcTemplate;
+
+    public void save(User user) {
+        jdbcTemplate.update("INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+                user.getId(), user.getName(), user.getEmail());
+    }
+
+    public List<User> findAll() {
+        return jdbcTemplate.query("SELECT * FROM users", userRowMapper());
+    }
+
+    private RowMapper<User> userRowMapper() {
+        return (rs, rowNum) -> {
+            User u = new User();
+            u.setId(rs.getInt("id"));
+            u.setName(rs.getString("name"));
+            u.setEmail(rs.getString("email"));
+            return u;
+        };
+    }
+}
+
+> Repeat similar for PostgresUserRepository and DatabricksUserRepository, just change the @Qualifier and bean injection accordingly.
+
+
+
+
+---
+
+✅ 4. Controller Example
+
+@RestController
+@RequestMapping("/api/users")
+public class UserController {
+
+    @Autowired
+    private MySQLUserRepository mysqlRepo;
+
+    @Autowired
+    private PostgresUserRepository postgresRepo;
+
+    @Autowired
+    private DatabricksUserRepository databricksRepo;
+
+    @PostMapping("/mysql")
+    public ResponseEntity<String> saveToMySQL(@RequestBody User user) {
+        mysqlRepo.save(user);
+        return ResponseEntity.ok("Saved to MySQL");
+    }
+
+    @PostMapping("/postgres")
+    public ResponseEntity<String> saveToPostgres(@RequestBody User user) {
+        postgresRepo.save(user);
+        return ResponseEntity.ok("Saved to PostgreSQL");
+    }
+
+    @PostMapping("/databricks")
+    public ResponseEntity<String> saveToDatabricks(@RequestBody User user) {
+        databricksRepo.save(user);
+        return ResponseEntity.ok("Saved to Databricks");
+    }
+
+    @GetMapping("/mysql")
+    public List<User> getAllMySQL() {
+        return mysqlRepo.findAll();
+    }
+
+    @GetMapping("/postgres")
+    public List<User> getAllPostgres() {
+        return postgresRepo.findAll();
+    }
+
+    @GetMapping("/databricks")
+    public List<User> getAllDatabricks() {
+        return databricksRepo.findAll();
+    }
+}
+
+
+---
+
+✅ 5. application.yml
+
+mysql:
+  datasource:
+    url: jdbc:mysql://localhost:3306/testdb
+    username: root
+    password: pass
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+postgres:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/testdb
+    username: postgres
+    password: pass
+    driver-class-name: org.postgresql.Driver
+
+databricks:
+  datasource:
+    url: jdbc:spark://<host>:443/default;transportMode=http;ssl=1;httpPath=<path>
+    username: token
+    password: <access-token>
+    driver-class-name: com.simba.spark.jdbc.Driver
+
+
+---
+
+✅ 6. Table DDL Example
+
+CREATE TABLE users (
+  id INT PRIMARY KEY,
+  name VARCHAR(100),
+  email VARCHAR(100)
+);
+
+
+---
+
+✅ Dependencies in pom.xml
+
+<!-- MySQL -->
+<dependency>
+    <groupId>com.mysql</groupId>
+    <artifactId>mysql-connector-j</artifactId>
+    <scope>runtime</scope>
+</dependency>
+
+<!-- PostgreSQL -->
+<dependency>
+    <groupId>org.postgresql</groupId>
+    <artifactId>postgresql</artifactId>
+    <scope>runtime</scope>
+</dependency>
+
+<!-- Databricks JDBC -->
+<!-- This may require manual addition to local repo -->
+<dependency>
+    <groupId>com.simba.spark</groupId>
+    <artifactId>spark-jdbc</artifactId>
+    <version>REPLACE_WITH_ACTUAL</version>
+</dependency>
+
+
+---
+
+🚨 Notes
+
+Databricks JDBC driver (Simba) may not be publicly available — download and install manually if needed.
+
+Each DB operation is independent; transactions are not shared across DBs.
+
+Spring Boot dev tools or JPA are not used here to keep the configuration simple and JDBC-focused.
+
+
+
+---
+
+Would you like a working GitHub repo or ZIP file with this structure?
+
+
 
