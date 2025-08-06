@@ -1,0 +1,157 @@
+Yes, you can use MySQL, PostgreSQL, and Databricks (usually via JDBC) drivers in a single Spring Boot application. This is called multi-datasource configuration, and it’s common in ETL, data integration, or microservice-style backend apps.
+
+However, there are important considerations to avoid dependency and configuration issues.
+
+
+---
+
+✅ Steps to Use MySQL, PostgreSQL, and Databricks in One Spring Boot App:
+
+1. Add All Required Dependencies in pom.xml (Maven)
+
+<!-- MySQL Driver -->
+<dependency>
+    <groupId>com.mysql</groupId>
+    <artifactId>mysql-connector-j</artifactId>
+    <scope>runtime</scope>
+</dependency>
+
+<!-- PostgreSQL Driver -->
+<dependency>
+    <groupId>org.postgresql</groupId>
+    <artifactId>postgresql</artifactId>
+    <scope>runtime</scope>
+</dependency>
+
+<!-- Databricks JDBC Driver (Simba JDBC Driver or similar) -->
+<dependency>
+    <groupId>com.databricks</groupId>
+    <artifactId>spark-jdbc_2.12</artifactId>
+    <version>REPLACE_WITH_ACTUAL</version>
+</dependency>
+
+You may need to manually download and install the Databricks JDBC driver JAR if it's not available on Maven Central.
+
+
+---
+
+2. Avoid Conflicts:
+
+Spring Boot will auto-configure only one datasource by default. To avoid confusion:
+
+Disable spring.datasource.* default configuration
+
+Define each datasource manually (using @Primary for the main one)
+
+Use separate JdbcTemplate or EntityManagerFactory for each DB
+
+
+
+---
+
+3. Configure Each Datasource Separately
+
+Use separate configuration classes:
+
+@Configuration
+@ConfigurationProperties(prefix = "mysql.datasource")
+public class MySQLConfig {
+    @Bean
+    @Primary
+    public DataSource mysqlDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean
+    public JdbcTemplate mysqlJdbcTemplate(@Qualifier("mysqlDataSource") DataSource ds) {
+        return new JdbcTemplate(ds);
+    }
+}
+
+@Configuration
+@ConfigurationProperties(prefix = "postgres.datasource")
+public class PostgresConfig {
+    @Bean
+    public DataSource postgresDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean
+    public JdbcTemplate postgresJdbcTemplate(@Qualifier("postgresDataSource") DataSource ds) {
+        return new JdbcTemplate(ds);
+    }
+}
+
+@Configuration
+@ConfigurationProperties(prefix = "databricks.datasource")
+public class DatabricksConfig {
+    @Bean
+    public DataSource databricksDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean
+    public JdbcTemplate databricksJdbcTemplate(@Qualifier("databricksDataSource") DataSource ds) {
+        return new JdbcTemplate(ds);
+    }
+}
+
+
+---
+
+4. application.yml / application.properties
+
+mysql:
+  datasource:
+    url: jdbc:mysql://localhost:3306/mydb
+    username: root
+    password: pass
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+postgres:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mydb
+    username: postgres
+    password: pass
+    driver-class-name: org.postgresql.Driver
+
+databricks:
+  datasource:
+    url: jdbc:spark://<databricks-host>:443/default;transportMode=http;ssl=1;httpPath=...
+    username: token
+    password: <your-access-token>
+    driver-class-name: com.simba.spark.jdbc.Driver
+
+
+---
+
+🧠 Notes:
+
+Do not use Spring Boot auto-configured JPA if using multiple DBs with JPA unless you configure multiple EntityManagerFactory beans (which gets complicated).
+
+If you're only reading/writing using JdbcTemplate, it's simpler and avoids JPA-related issues.
+
+Databricks might require a custom driver or special URL formatting.
+
+You must isolate transactions if using different databases for atomic operations.
+
+
+
+---
+
+✅ Summary
+
+Aspect	Support?	Notes
+
+Multiple DBs (MySQL, PG)	✅ Yes	Use separate beans
+Databricks JDBC	✅ Yes	May require manual driver
+Auto-configuration issue	⚠️ Yes	Avoid Spring Boot's default spring.datasource.*
+Conflict in drivers	❌ No	Not if you configure carefully
+Recommended DB access	✅ JdbcTemplate	Easier than JPA for multi-DB
+
+
+
+---
+
+If you'd like, I can give you a working example with JdbcTemplate using all 3 databases. Let me know.
+
