@@ -1,0 +1,92 @@
+import React, { useState, useMemo } from "react";
+// import { Card } from "@/components/ui/card";
+export const CAR_LIST = [
+  { id: 1, make: "Mitsubishi", model: "Lancer", type: "Used" },
+  { id: 2, make: "Honda", model: "Vezel", type: "New" },
+  { id: 3, make: "Honda", model: "Civic", type: "Used" },
+  { id: 4, make: "Audi", model: "A3", type: "New" },
+  { id: 5, make: "Audi", model: "A4", type: "Used" },
+  { id: 6, make: "Audi", model: "A7", type: "New" },
+  { id: 7, make: "BMW", model: "i8", type: "Used" },
+  { id: 8, make: "Toyota", model: "Caomry", type: "New" },
+  { id: 9, make: "Ford", model: "Mustang", type: "New" },
+  { id: 10, make: "Chevrolet", model: "Impala", type: "Used" },
+];
+
+export const PRICE_LIST = [
+  { car_id: 1, price: 10000000 },
+  { car_id: 2, price: 2000 },
+  { car_id: 3, price: 3000 },
+  { car_id: 4, price: 4000 },
+  { car_id: 5, price: 5000 },
+  { car_id: 6, price: 6000 },
+  { car_id: 7, price: 7000 },
+  { car_id: 8, price: 2500 },
+  { car_id: 9, price: 35000 },
+  { car_id: 10, price: 8000 },
+];
+
+const App = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Combine car and price data
+  const carsWithPrices = useMemo(() => {
+    return CAR_LIST.map((car) => ({
+      ...car,
+      price: PRICE_LIST.find((price) => price.car_id === car.id)?.price,
+    }));
+  }, []);
+
+  // Filter cars based on search terms
+  const filteredCars = useMemo(() => {
+    if (!searchTerm.trim()) return carsWithPrices;
+
+    // Split search term into individual words and remove empty strings
+    const searchTerms = searchTerm
+      .toLowerCase()
+      .split(" ")
+      .filter((term) => term);
+
+    return carsWithPrices.filter((car) => {
+      // Check if any of the search terms match either make or model
+      return searchTerms.some(
+        (term) =>
+          car.make.toLowerCase().includes(term) ||
+          car.model.toLowerCase().includes(term)
+      );
+    });
+  }, [searchTerm, carsWithPrices]);
+
+  return (
+    <div className="p-4 max-w-4xl mx-auto">
+      {/* {JSON.stringify(carsWithPrices)} */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search cars by make or model..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full p-2 border rounded-lg"
+        />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredCars.map((car) => (
+          <div key={car.id} className="p-4">
+            <h3 className="font-bold">
+              {car.make} {car.model}
+            </h3>
+            <div className="text-gray-600">
+              <p>Type: {car.type}</p>
+              <p>Price: ${car.price?.toLocaleString()}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 text-gray-600">Found {filteredCars.length} cars</div>
+    </div>
+  );
+};
+
+export default App;
