@@ -1,0 +1,2072 @@
+Got it ✅ You want to create a documentation guide for your Spring Boot application where you’re using Redis cache + Redisson for distributed locking + custom key generator for REST APIs.
+
+Since your audience includes your Lead Architect and Manager, the document should be structured, high-level for non-developers, but also include enough technical detail for developers to understand and implement/extend.
+
+Here’s how you can structure it:
+
+
+---
+
+📄 Suggested Document Structure
+
+1. Introduction
+
+Purpose of the Document
+Explain why Redis caching + Redisson + distributed locks are being used.
+Example: "To improve API performance, ensure data consistency across distributed systems, and avoid duplicate processing by using Redis cache with Redisson locks and a custom key generator."
+
+Target Audience
+
+Architects → High-level understanding of design and architecture.
+
+Managers → Benefits, performance improvements, and risks.
+
+Developers → Implementation details and usage patterns.
+
+
+
+
+---
+
+2. Background & Problem Statement
+
+Problems without caching (e.g., repeated DB hits, latency).
+
+Problems without distributed locking (e.g., race conditions, duplicate entries).
+
+Why a custom key generator is needed (e.g., cache granularity, uniqueness per API request).
+
+
+
+---
+
+3. Solution Overview
+
+Redis Cache → Used for performance optimization.
+
+Redisson Distributed Lock → Prevents race conditions in concurrent API calls.
+
+Custom Key Generator → Ensures unique and consistent cache keys based on request parameters.
+
+
+You can also add an architecture diagram:
+
+REST API → Service Layer → Redis Cache (read/write) → Database (fallback).
+
+Redisson Lock wrapping DB/critical operations.
+
+
+
+---
+
+4. Architecture & Flow
+
+4.1 Cache Flow
+
+1. API request comes in.
+
+
+2. Key generated via custom key generator.
+
+
+3. Redis checked for existing value.
+
+
+4. If found → return cached response.
+
+
+5. If not found → acquire lock → fetch from DB → store in cache → release lock.
+
+
+
+4.2 Distributed Locking Flow
+
+Multiple requests for same resource.
+
+Redisson ensures only one acquires lock.
+
+Others wait or fail-fast (depending on config).
+
+
+Add sequence diagrams here.
+
+
+---
+
+5. Implementation Details
+
+5.1 Dependencies
+
+Spring Boot
+
+Redis
+
+Redisson (redisson-spring-boot-starter)
+
+
+5.2 Configuration
+
+application.properties (Redis host, port, password, connection pool).
+
+Redisson YAML/JSON config if used.
+
+
+5.3 Code Snippets
+
+Cache Manager Config
+
+Custom Key Generator (example with method signature + request params).
+
+Redisson Lock Usage (tryLock, lock timeout, release best practices).
+
+
+
+---
+
+6. Best Practices
+
+Use short TTLs for cache keys when data changes frequently.
+
+Avoid locking large critical sections (only wrap sensitive code).
+
+Always release lock in finally block.
+
+Use consistent naming convention for keys (APIName:ResourceId:Params).
+
+Handle cache eviction gracefully.
+
+
+
+---
+
+7. Monitoring & Metrics
+
+How to monitor Redis (memory, latency, hit/miss ratio).
+
+Log lock acquisition failures.
+
+Track cache size and eviction stats.
+
+Integration with Prometheus/Grafana if available.
+
+
+
+---
+
+8. Benefits
+
+Reduced DB load.
+
+Faster response times.
+
+Prevents duplicate processing.
+
+Scalable across multiple instances.
+
+
+
+---
+
+9. Risks & Mitigation
+
+Redis downtime → fallback strategy (direct DB calls).
+
+Lock timeout misconfiguration → deadlocks or stale data.
+
+Cache inconsistency → use TTLs and invalidation carefully.
+
+
+
+---
+
+10. Future Enhancements
+
+Multi-region Redis setup for DR.
+
+Advanced caching strategies (write-through, refresh-ahead).
+
+Fine-grained key management service.
+
+
+
+---
+
+11. Appendix
+
+References (Redis docs, Redisson docs, Spring Cache docs).
+
+Glossary (Cache Hit, Cache Miss, TTL, Lock, Eviction).
+
+
+
+---
+
+👉 That structure makes it self-explanatory for managers and technical enough for architects & developers.
+
+
+---
+
+Would you like me to draft a detailed template with some real example code snippets and diagrams placeholders, so you can just fill in your project-specific details?
+
+
+
+
+№##########№#################₹####
+
+Perfect 👍 — let’s build a ready-to-use document template for your project, including the details you just shared:
+
+TTL = 1 day
+
+Custom key generator is optional (can use static key if required)
+
+
+I’ll structure it so you can share it with your lead architect and manager — clean, clear, and complete.
+
+
+---
+
+📄 Redis Cache with Redisson Distributed Lock in Spring Boot
+
+
+---
+
+1. Introduction
+
+This document describes the implementation of Redis caching with Redisson distributed locks and an optional custom key generator in our Spring Boot REST API services.
+
+The goal is to:
+
+Improve API performance by reducing database calls.
+
+Ensure data consistency across multiple service instances.
+
+Prevent race conditions when multiple requests modify the same resource.
+
+
+
+---
+
+2. Background & Problem Statement
+
+Without caching, each API call hits the database, leading to latency and high load.
+
+Without distributed locks, concurrent requests could update the same resource at the same time, leading to data corruption or duplicate processing.
+
+A key generator ensures cache keys are consistent and unique per request.
+
+
+
+---
+
+3. Solution Overview
+
+Redis Cache: Used to store frequently accessed API results with a Time-To-Live (TTL) of 1 day.
+
+Redisson Distributed Lock: Ensures only one request updates the resource at a time.
+
+Custom Key Generator (Optional):
+
+Can generate dynamic keys based on request parameters.
+
+Alternatively, a static key can be provided for simple use cases.
+
+
+
+
+---
+
+4. Architecture & Flow
+
+4.1 Cache Flow
+
+1. API receives request.
+
+
+2. Generate cache key (custom or static).
+
+
+3. Check Redis for cached response.
+
+
+4. If found → return cached data.
+
+
+5. If not found → acquire lock → fetch from DB → store in cache (TTL=1 day) → release lock.
+
+
+
+4.2 Locking Flow
+
+Multiple requests for the same resource.
+
+Redisson ensures only one thread acquires the lock.
+
+Others wait or fail depending on lock timeout configuration.
+
+
+📌 Diagram Placeholder
+Add here: Sequence diagram showing API → Cache → DB with Lock.
+
+
+---
+
+5. Implementation Details
+
+5.1 Dependencies
+
+<dependency>
+    <groupId>org.redisson</groupId>
+    <artifactId>redisson-spring-boot-starter</artifactId>
+    <version>3.26.0</version>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+
+
+---
+
+5.2 Configuration (application.properties)
+
+spring.redis.host=localhost
+spring.redis.port=6379
+spring.redis.password=
+spring.cache.type=redis
+spring.cache.redis.time-to-live=86400000   # TTL = 1 day (in ms)
+
+
+---
+
+5.3 Redisson Configuration (Optional YAML)
+
+singleServerConfig:
+  address: "redis://127.0.0.1:6379"
+  connectionPoolSize: 64
+  connectionMinimumIdleSize: 24
+threads: 4
+nettyThreads: 4
+
+
+---
+
+5.4 Custom Key Generator (Optional)
+
+@Component("customKeyGenerator")
+public class CustomKeyGenerator implements KeyGenerator {
+    @Override
+    public Object generate(Object target, Method method, Object... params) {
+        // Example: APIName:Method:Params
+        return method.getName() + ":" + Arrays.toString(params);
+    }
+}
+
+Usage with annotation:
+
+@Cacheable(value = "UserCache", keyGenerator = "customKeyGenerator")
+public User getUserById(Long id) { ... }
+
+Or with a static key:
+
+@Cacheable(value = "UserCache", key = "'staticKey'")
+public User getDefaultUser() { ... }
+
+
+---
+
+5.5 Redisson Distributed Lock Example
+
+@Autowired
+private RedissonClient redissonClient;
+
+public void updateUser(Long id) {
+    RLock lock = redissonClient.getLock("userLock:" + id);
+    try {
+        if (lock.tryLock(5, 10, TimeUnit.SECONDS)) {
+            // critical section
+            User user = userRepository.findById(id).orElseThrow();
+            user.setLastUpdated(LocalDateTime.now());
+            userRepository.save(user);
+        }
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+    } finally {
+        if (lock.isHeldByCurrentThread()) {
+            lock.unlock();
+        }
+    }
+}
+
+
+---
+
+6. Best Practices
+
+Use TTL = 1 day to ensure data freshness.
+
+Apply locks only on critical sections.
+
+Always release locks in a finally block.
+
+Use static keys only when data scope is global, otherwise prefer custom key generator.
+
+Define naming convention for keys (e.g., APIName:ResourceId).
+
+
+
+---
+
+7. Monitoring & Metrics
+
+Track Redis hit/miss ratio.
+
+Monitor lock acquisition failures.
+
+Use tools like RedisInsight, Grafana, Prometheus.
+
+
+
+---
+
+8. Benefits
+
+Faster API responses (cache-first).
+
+Reduced database load.
+
+Prevents duplicate or conflicting updates.
+
+Scales across multiple service instances.
+
+
+
+---
+
+9. Risks & Mitigation
+
+Risk	Mitigation
+
+Redis downtime	Fallback to DB queries
+Stale cache	Use TTL + manual eviction
+Deadlocks / stuck locks	Configure lock timeout carefully
+Cache key collisions	Use clear naming convention
+
+
+
+---
+
+10. Future Enhancements
+
+Multi-region Redis for disaster recovery.
+
+Advanced caching strategies (write-through, refresh-ahead).
+
+Key invalidation service.
+
+
+
+---
+
+11. Appendix
+
+Spring Cache Docs
+
+Redisson Docs
+
+Redis Docs
+
+
+
+---
+
+✅ With this template:
+
+Your manager gets the business value (performance, consistency, risks).
+
+Your architect gets the system design, flows, and best practices.
+
+Your developers get implementation details with working examples.
+
+
+
+---
+
+Do you also want me to add a ready-made sequence diagram (mermaid format or PlantUML) for cache + lock flow so you can drop it directly into your document?
+
+
+
+
+
+###₹#₹#₹₹₹###₹#₹#₹#₹#₹₹#₹
+
+Great 👍 let’s add ready-to-use sequence diagrams (in Mermaid format, since it works in Markdown/Docs/Confluence/GitHub**). You can copy-paste these into your doc, and tools like Mermaid Live Editor will render them.
+
+
+---
+
+1. Cache Flow with TTL = 1 Day
+
+sequenceDiagram
+    participant Client as Client
+    participant API as REST API
+    participant Cache as Redis Cache
+    participant DB as Database
+
+    Client->>API: Request Resource (id=123)
+    API->>Cache: Check if key exists (User:123)
+    alt Cache Hit
+        Cache-->>API: Return cached data
+        API-->>Client: Response (from cache)
+    else Cache Miss
+        API->>Cache: Key not found
+        API->>DB: Fetch data
+        DB-->>API: Return data
+        API->>Cache: Store data with TTL=1 day
+        API-->>Client: Response (from DB)
+    end
+
+
+---
+
+2. Distributed Lock Flow (Redisson)
+
+sequenceDiagram
+    participant Client1 as Client 1
+    participant Client2 as Client 2
+    participant API as REST API
+    participant Lock as Redisson Lock
+    participant DB as Database
+    participant Cache as Redis Cache
+
+    Client1->>API: Update Resource (id=123)
+    Client2->>API: Update Resource (id=123)
+
+    API->>Lock: Try to acquire lock (userLock:123)
+
+    alt Client1 acquires lock
+        Lock-->>API: Lock granted
+        API->>DB: Update resource
+        DB-->>API: Success
+        API->>Cache: Invalidate/Update cache
+        API->>Lock: Release lock
+        API-->>Client1: Success Response
+    else Client2 waits/fails
+        Lock-->>API: Lock not available (waiting or timeout)
+        API-->>Client2: Retry/Fallback Response
+    end
+
+
+---
+
+3. Cache + Lock Combined Flow
+
+sequenceDiagram
+    participant Client as Client
+    participant API as REST API
+    participant Cache as Redis Cache
+    participant Lock as Redisson Lock
+    participant DB as Database
+
+    Client->>API: Request Resource (id=123)
+    API->>Cache: Check cache (User:123)
+    alt Cache Hit
+        Cache-->>API: Return cached data
+        API-->>Client: Response (from cache)
+    else Cache Miss
+        API->>Lock: Acquire lock (User:123)
+        alt Lock Acquired
+            Lock-->>API: Lock granted
+            API->>DB: Fetch resource
+            DB-->>API: Return data
+            API->>Cache: Store data (TTL=1 day)
+            API->>Lock: Release lock
+            API-->>Client: Response (from DB)
+        else Lock Failed
+            Lock-->>API: Wait or timeout
+            API-->>Client: Retry or error
+        end
+    end
+
+
+---
+
+💡 With these diagrams:
+
+Managers can visualize the process (no tech jargon needed).
+
+Architects can verify flows (cache-first, lock fallback).
+
+Developers can implement based on sequence logic.
+
+
+
+---
+
+Do you also want me to extend this doc with an ER diagram (cache keys & structure) to show how keys are stored in Redis (e.g., User:ID, API:Param1:Param2)? That can help architects/managers see the naming convention at a glance.
+
+
+#######₹₹₹₹₹₹#######
+
+
+
+Perfect ✅ — let’s extend your doc with an ER-style diagram for Redis key structure so your lead architect and manager can quickly grasp how keys are organized.
+
+Since Redis is a key-value store (not relational), we’ll show it as a logical key design diagram.
+
+
+---
+
+4. Redis Key Structure & Naming Convention
+
+We follow a structured naming convention for cache keys to avoid collisions and make debugging easier.
+
+🔑 Key Format
+
+<Entity>:<Identifier>[:<SubIdentifier>]
+
+Examples:
+
+User:123 → Cache data for user with ID 123.
+
+Order:987:Items → Items of order 987.
+
+API:GetUser:123:Profile → API response for GetUser call for user 123.
+
+Static:Config → Static/global cached data (no key generator).
+
+
+
+---
+
+4.1 Redis Key Structure Diagram (Mermaid ER-style)
+
+erDiagram
+    USER {
+        string User:123
+        object User JSON object
+        ttl 1 Day
+    }
+
+    ORDER {
+        string Order:987
+        object Order JSON object
+        ttl 1 Day
+    }
+
+    ORDER_ITEMS {
+        string Order:987:Items
+        list Items of order 987
+        ttl 1 Day
+    }
+
+    API_CACHE {
+        string API:GetUser:123:Profile
+        json API response payload
+        ttl 1 Day
+    }
+
+    STATIC_CACHE {
+        string Static:Config
+        object Static configuration data
+        ttl 1 Day
+    }
+
+    USER ||--|| ORDER : "User places Orders"
+    ORDER ||--o{ ORDER_ITEMS : "Order contains Items"
+    API_CACHE ||--|| USER : "API maps to User resource"
+    STATIC_CACHE {
+        note: "Global or static data (e.g., app configs)"
+    }
+
+
+---
+
+4.2 Explanation
+
+TTL = 1 Day applies to all cache keys.
+
+Custom Key Generator: Used when keys depend on API parameters (e.g., API:GetUser:123:Profile).
+
+Static Keys: Used for global or rarely changing data (e.g., Static:Config).
+
+Consistency: Always follow Entity:Id[:SubId] or API:Method:Params pattern.
+
+
+
+---
+
+4.3 Benefits of This Structure
+
+Avoids collisions across services.
+
+Readable keys (easy to debug with redis-cli keys *).
+
+Flexible: works with both static and dynamic/custom key generators.
+
+Aligned with TTL strategy (auto-expiry ensures freshness).
+
+
+
+---
+
+👉 With this section:
+
+Your manager sees the structure and TTL strategy.
+
+Your architect understands how to design cache keys safely.
+
+Your developers know the exact naming convention to follow.
+
+
+
+---
+
+Would you like me to also add a sample Redis dump screenshot / sample JSON data (mocked) to show how actual cached entries will look in Redis CLI (get key) for even more clarity in the doc?
+
+
+
+
+###############################
+
+
+Awesome 🚀 — let’s add a sample Redis dump section to your doc so everyone (managers, architects, developers) can visualize how the cached data actually looks when queried from Redis CLI.
+
+
+---
+
+5. Sample Redis Cache Data
+
+Below are some realistic examples of how cache keys and values appear inside Redis.
+
+
+---
+
+5.1 CLI Examples
+
+Example 1 – User Cache
+
+127.0.0.1:6379> keys User:*
+1) "User:123"
+2) "User:124"
+
+127.0.0.1:6379> ttl User:123
+(integer) 86300   # ~23h 58m left (1 day TTL set)
+
+127.0.0.1:6379> get User:123
+"{\"id\":123,\"name\":\"John Doe\",\"email\":\"john@example.com\",\"lastUpdated\":\"2025-09-10T12:45:30\"}"
+
+
+---
+
+Example 2 – Order with Items
+
+127.0.0.1:6379> keys Order:987*
+1) "Order:987"
+2) "Order:987:Items"
+
+127.0.0.1:6379> get Order:987
+"{\"id\":987,\"status\":\"SHIPPED\",\"total\":150.75}"
+
+127.0.0.1:6379> get Order:987:Items
+"[{\"itemId\":1,\"product\":\"Laptop\",\"qty\":1},{\"itemId\":2,\"product\":\"Mouse\",\"qty\":2}]"
+
+
+---
+
+Example 3 – API Response Cache with Custom Key
+
+127.0.0.1:6379> keys API:GetUser:*
+1) "API:GetUser:123:Profile"
+
+127.0.0.1:6379> get API:GetUser:123:Profile
+"{\"id\":123,\"name\":\"John Doe\",\"profile\":{\"age\":32,\"country\":\"India\"}}"
+
+
+---
+
+Example 4 – Static Key Example
+
+127.0.0.1:6379> get Static:Config
+"{\"version\":\"1.0.0\",\"featureFlags\":{\"newUI\":true,\"betaAPI\":false}}"
+
+
+---
+
+5.2 Notes
+
+JSON format is recommended for readability & easy deserialization.
+
+TTL is always set to 1 day (spring.cache.redis.time-to-live=86400000).
+
+Custom keys make debugging easier when tracing API behavior.
+
+Static keys should be used only for global data (configs, constants).
+
+
+
+---
+
+✅ With this section:
+
+Manager → sees that Redis auto-expires cache safely (TTL).
+
+Architect → verifies key naming and JSON structures.
+
+Developer → can run the exact redis-cli commands to debug.
+
+
+
+---
+
+👉 Now you have:
+
+1. Architecture diagrams (flow + lock)
+
+
+2. ER diagram for key design
+
+
+3. Sample Redis dump (with JSON)
+
+
+
+This is enough for a full documentation pack.
+
+Do you also want me to include a summary table comparing when to use static key vs custom key generator so that your team has a quick decision guide?
+
+
+
+
+###############
+
+Perfect ✅ — a decision guide table will make it super clear when to use Static Key vs Custom Key Generator.
+
+You can add this as a quick-reference section in your document.
+
+
+---
+
+6. Static Key vs Custom Key Generator — Decision Guide
+
+Use Case	Static Key (key = 'staticKey')	Custom Key Generator
+
+Global or shared data (e.g., app config, static lookup tables, feature flags)	✅ Best choice (all requests use the same cached entry)	❌ Not needed
+API responses with no dynamic parameters (e.g., /api/version, /api/health)	✅ Simple and efficient	❌ Overkill
+Data scoped to a single resource ID (e.g., User:123, Order:987)	❌ Risk of overwriting if reused incorrectly	✅ Generates unique keys per resource
+Parameterized API requests (e.g., /api/getUser?id=123&type=profile)	❌ Cannot differentiate requests	✅ Keys generated per method + params (e.g., API:GetUser:123:Profile)
+Debugging & tracing	❌ Hard to know what the static key maps to without checking code	✅ Readable keys (API:Method:Params)
+Performance-sensitive, no need for granularity	✅ Faster since key is always the same	⚠️ May cause cache pollution if multiple contexts use same key
+Consistency across microservices	❌ Static keys may collide	✅ Helps maintain namespaced, safe keys
+
+
+
+---
+
+📌 Key Takeaways
+
+Static Key → Use for global, rarely changing, non-parameterized data.
+
+Custom Key Generator → Use for API calls with parameters, resource-specific data, and multi-tenant scenarios.
+
+Both approaches respect the 1-day TTL for consistency.
+
+Always follow naming conventions (Entity:Id[:SubId] or API:Method:Params).
+
+
+
+---
+
+👉 With this table, your:
+
+Manager sees the business logic behind each choice.
+
+Architect gets clear rules to enforce across the team.
+
+Developers avoid confusion when adding caching to new APIs.
+
+
+
+---
+
+Would you like me to now bundle everything (flows, diagrams, Redis dumps, decision table) into a single final “Document Template” you can directly share with your manager/architect as a polished draft?
+
+###########₹#₹#₹#₹#₹₹#
+Great 👍 Let’s put it all together into a single polished documentation template for your Spring Boot application with Redis cache, Redisson distributed locks, and optional custom key generator.
+
+You can directly share this with your Lead Architect and Manager.
+
+
+---
+
+📄 Redis Cache with Redisson Distributed Lock in Spring Boot
+
+
+---
+
+1. Introduction
+
+This document describes the implementation of Redis caching with Redisson distributed locks and an optional custom key generator in our Spring Boot REST API services.
+
+Purpose
+
+Improve API performance by reducing database calls.
+
+Ensure data consistency across multiple instances.
+
+Prevent race conditions in concurrent API requests.
+
+
+Audience
+
+Managers → Understand business benefits.
+
+Architects → Review system design.
+
+Developers → Get implementation guidance.
+
+
+
+---
+
+2. Background & Problem Statement
+
+Without caching → APIs repeatedly hit the database → higher latency and load.
+
+Without distributed locking → concurrent requests may update the same resource simultaneously → inconsistent data.
+
+Without a proper key strategy → risk of cache collisions and difficulty in debugging.
+
+
+
+---
+
+3. Solution Overview
+
+Redis Cache → Improves performance by caching API responses.
+
+TTL = 1 Day → Ensures data freshness and automatic cleanup.
+
+Redisson Distributed Lock → Guarantees safe concurrent operations.
+
+Custom Key Generator (Optional) → Creates unique keys per API call.
+
+Static Keys → Available for global/static data when granularity is not required.
+
+
+
+---
+
+4. Architecture & Flow
+
+4.1 Cache Flow
+
+sequenceDiagram
+    participant Client as Client
+    participant API as REST API
+    participant Cache as Redis Cache
+    participant DB as Database
+
+    Client->>API: Request Resource (id=123)
+    API->>Cache: Check if key exists (User:123)
+    alt Cache Hit
+        Cache-->>API: Return cached data
+        API-->>Client: Response (from cache)
+    else Cache Miss
+        API->>DB: Fetch data
+        DB-->>API: Return data
+        API->>Cache: Store data with TTL=1 day
+        API-->>Client: Response (from DB)
+    end
+
+
+---
+
+4.2 Locking Flow
+
+sequenceDiagram
+    participant Client1 as Client 1
+    participant Client2 as Client 2
+    participant API as REST API
+    participant Lock as Redisson Lock
+    participant DB as Database
+    participant Cache as Redis Cache
+
+    Client1->>API: Update Resource (id=123)
+    Client2->>API: Update Resource (id=123)
+
+    API->>Lock: Try to acquire lock (userLock:123)
+
+    alt Client1 acquires lock
+        Lock-->>API: Lock granted
+        API->>DB: Update resource
+        DB-->>API: Success
+        API->>Cache: Invalidate/Update cache
+        API->>Lock: Release lock
+        API-->>Client1: Success Response
+    else Client2 waits/fails
+        Lock-->>API: Lock not available
+        API-->>Client2: Retry/Fallback Response
+    end
+
+
+---
+
+4.3 Cache + Lock Combined Flow
+
+sequenceDiagram
+    participant Client as Client
+    participant API as REST API
+    participant Cache as Redis Cache
+    participant Lock as Redisson Lock
+    participant DB as Database
+
+    Client->>API: Request Resource (id=123)
+    API->>Cache: Check cache (User:123)
+    alt Cache Hit
+        Cache-->>API: Return cached data
+        API-->>Client: Response (from cache)
+    else Cache Miss
+        API->>Lock: Acquire lock (User:123)
+        alt Lock Acquired
+            Lock-->>API: Lock granted
+            API->>DB: Fetch resource
+            DB-->>API: Return data
+            API->>Cache: Store data (TTL=1 day)
+            API->>Lock: Release lock
+            API-->>Client: Response (from DB)
+        else Lock Failed
+            Lock-->>API: Wait or timeout
+            API-->>Client: Retry or error
+        end
+    end
+
+
+---
+
+5. Implementation Details
+
+5.1 Dependencies
+
+<dependency>
+    <groupId>org.redisson</groupId>
+    <artifactId>redisson-spring-boot-starter</artifactId>
+    <version>3.26.0</version>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+
+
+---
+
+5.2 Configuration (application.properties)
+
+spring.redis.host=localhost
+spring.redis.port=6379
+spring.cache.type=redis
+spring.cache.redis.time-to-live=86400000   # 1 day TTL in ms
+
+
+---
+
+5.3 Custom Key Generator (Optional)
+
+@Component("customKeyGenerator")
+public class CustomKeyGenerator implements KeyGenerator {
+    @Override
+    public Object generate(Object target, Method method, Object... params) {
+        return method.getName() + ":" + Arrays.toString(params);
+    }
+}
+
+Usage:
+
+// Dynamic keys
+@Cacheable(value = "UserCache", keyGenerator = "customKeyGenerator")
+public User getUserById(Long id) { ... }
+
+// Static key
+@Cacheable(value = "ConfigCache", key = "'Static:Config'")
+public Config getAppConfig() { ... }
+
+
+---
+
+5.4 Redisson Lock Example
+
+@Autowired
+private RedissonClient redissonClient;
+
+public void updateUser(Long id) {
+    RLock lock = redissonClient.getLock("userLock:" + id);
+    try {
+        if (lock.tryLock(5, 10, TimeUnit.SECONDS)) {
+            User user = userRepository.findById(id).orElseThrow();
+            user.setLastUpdated(LocalDateTime.now());
+            userRepository.save(user);
+        }
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+    } finally {
+        if (lock.isHeldByCurrentThread()) {
+            lock.unlock();
+        }
+    }
+}
+
+
+---
+
+6. Redis Key Structure
+
+6.1 Key Format
+
+<Entity>:<Identifier>[:<SubIdentifier>]
+
+6.2 Example Keys
+
+User:123 → User record
+
+Order:987:Items → Items of an order
+
+API:GetUser:123:Profile → API response
+
+Static:Config → Global configuration
+
+
+
+---
+
+6.3 ER-style Diagram
+
+erDiagram
+    USER {
+        string User:123
+        object User JSON object
+        ttl 1 Day
+    }
+
+    ORDER {
+        string Order:987
+        object Order JSON object
+        ttl 1 Day
+    }
+
+    ORDER_ITEMS {
+        string Order:987:Items
+        list Items JSON
+        ttl 1 Day
+    }
+
+    API_CACHE {
+        string API:GetUser:123:Profile
+        json API response
+        ttl 1 Day
+    }
+
+    STATIC_CACHE {
+        string Static:Config
+        object Static configuration
+        ttl 1 Day
+    }
+
+
+---
+
+7. Sample Redis Data (CLI Dump)
+
+127.0.0.1:6379> keys User:*
+1) "User:123"
+
+127.0.0.1:6379> get User:123
+"{\"id\":123,\"name\":\"John Doe\",\"email\":\"john@example.com\"}"
+
+127.0.0.1:6379> get API:GetUser:123:Profile
+"{\"id\":123,\"profile\":{\"age\":32,\"country\":\"India\"}}"
+
+127.0.0.1:6379> get Static:Config
+"{\"version\":\"1.0.0\",\"featureFlags\":{\"newUI\":true}}"
+
+
+---
+
+8. Static Key vs Custom Key Generator — Decision Guide
+
+Use Case	Static Key	Custom Key Generator
+
+Global/shared data (configs, flags)	✅	❌
+Non-parameterized API responses	✅	❌
+Resource-specific data (User:123)	❌	✅
+Parameterized APIs (GetUser:123:Profile)	❌	✅
+Debugging readability	❌	✅
+Cross-service safety	❌	✅
+
+
+Key takeaway:
+
+Use static keys for global/static data.
+
+Use custom keys for dynamic, parameterized, or per-resource data.
+
+
+
+---
+
+9. Best Practices
+
+Keep TTL = 1 day for all keys.
+
+Use tryLock with timeout to avoid deadlocks.
+
+Always release lock in finally block.
+
+Follow naming convention Entity:Id[:SubId] or API:Method:Params.
+
+Monitor Redis memory usage, hit/miss ratio, and lock failures.
+
+
+
+---
+
+10. Benefits
+
+Faster API response times.
+
+Reduced database load.
+
+Safe concurrent access with distributed locking.
+
+Clear, maintainable cache key structure.
+
+
+
+---
+
+11. Risks & Mitigation
+
+Risk	Mitigation
+
+Redis downtime	Fallback to DB
+Stale cache	TTL + eviction policies
+Lock misconfiguration	Proper timeout settings
+Key collisions	Standard naming convention
+
+
+
+---
+
+12. Future Enhancements
+
+Multi-region Redis setup (for DR).
+
+Advanced caching strategies (write-through, refresh-ahead).
+
+Key invalidation service for fine-grained control.
+
+
+
+---
+
+✅ This is a complete end-to-end documentation:
+
+Flows & diagrams (cache, lock, combined).
+
+Key structure & examples.
+
+Sample Redis dump.
+
+Static vs custom key decision guide.
+
+Risks, benefits, best practices.
+
+
+
+---
+
+Would you like me to also create a concise 1-page executive summary version of this doc for your manager (just business benefits, risks, and high-level flow) so they don’t need to read all 12 sections?
+
+№######@₹@####@₹@#₹#@#####₹₹₹₹##
+Great 👍 Let’s put it all together into a single polished documentation template for your Spring Boot application with Redis cache, Redisson distributed locks, and optional custom key generator.
+
+You can directly share this with your Lead Architect and Manager.
+
+
+---
+
+📄 Redis Cache with Redisson Distributed Lock in Spring Boot
+
+
+---
+
+1. Introduction
+
+This document describes the implementation of Redis caching with Redisson distributed locks and an optional custom key generator in our Spring Boot REST API services.
+
+Purpose
+
+Improve API performance by reducing database calls.
+
+Ensure data consistency across multiple instances.
+
+Prevent race conditions in concurrent API requests.
+
+
+Audience
+
+Managers → Understand business benefits.
+
+Architects → Review system design.
+
+Developers → Get implementation guidance.
+
+
+
+---
+
+2. Background & Problem Statement
+
+Without caching → APIs repeatedly hit the database → higher latency and load.
+
+Without distributed locking → concurrent requests may update the same resource simultaneously → inconsistent data.
+
+Without a proper key strategy → risk of cache collisions and difficulty in debugging.
+
+
+
+---
+
+3. Solution Overview
+
+Redis Cache → Improves performance by caching API responses.
+
+TTL = 1 Day → Ensures data freshness and automatic cleanup.
+
+Redisson Distributed Lock → Guarantees safe concurrent operations.
+
+Custom Key Generator (Optional) → Creates unique keys per API call.
+
+Static Keys → Available for global/static data when granularity is not required.
+
+
+
+---
+
+4. Architecture & Flow
+
+4.1 Cache Flow
+
+sequenceDiagram
+    participant Client as Client
+    participant API as REST API
+    participant Cache as Redis Cache
+    participant DB as Database
+
+    Client->>API: Request Resource (id=123)
+    API->>Cache: Check if key exists (User:123)
+    alt Cache Hit
+        Cache-->>API: Return cached data
+        API-->>Client: Response (from cache)
+    else Cache Miss
+        API->>DB: Fetch data
+        DB-->>API: Return data
+        API->>Cache: Store data with TTL=1 day
+        API-->>Client: Response (from DB)
+    end
+
+
+---
+
+4.2 Locking Flow
+
+sequenceDiagram
+    participant Client1 as Client 1
+    participant Client2 as Client 2
+    participant API as REST API
+    participant Lock as Redisson Lock
+    participant DB as Database
+    participant Cache as Redis Cache
+
+    Client1->>API: Update Resource (id=123)
+    Client2->>API: Update Resource (id=123)
+
+    API->>Lock: Try to acquire lock (userLock:123)
+
+    alt Client1 acquires lock
+        Lock-->>API: Lock granted
+        API->>DB: Update resource
+        DB-->>API: Success
+        API->>Cache: Invalidate/Update cache
+        API->>Lock: Release lock
+        API-->>Client1: Success Response
+    else Client2 waits/fails
+        Lock-->>API: Lock not available
+        API-->>Client2: Retry/Fallback Response
+    end
+
+
+---
+
+4.3 Cache + Lock Combined Flow
+
+sequenceDiagram
+    participant Client as Client
+    participant API as REST API
+    participant Cache as Redis Cache
+    participant Lock as Redisson Lock
+    participant DB as Database
+
+    Client->>API: Request Resource (id=123)
+    API->>Cache: Check cache (User:123)
+    alt Cache Hit
+        Cache-->>API: Return cached data
+        API-->>Client: Response (from cache)
+    else Cache Miss
+        API->>Lock: Acquire lock (User:123)
+        alt Lock Acquired
+            Lock-->>API: Lock granted
+            API->>DB: Fetch resource
+            DB-->>API: Return data
+            API->>Cache: Store data (TTL=1 day)
+            API->>Lock: Release lock
+            API-->>Client: Response (from DB)
+        else Lock Failed
+            Lock-->>API: Wait or timeout
+            API-->>Client: Retry or error
+        end
+    end
+
+
+---
+
+5. Implementation Details
+
+5.1 Dependencies
+
+<dependency>
+    <groupId>org.redisson</groupId>
+    <artifactId>redisson-spring-boot-starter</artifactId>
+    <version>3.26.0</version>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+
+
+---
+
+5.2 Configuration (application.properties)
+
+spring.redis.host=localhost
+spring.redis.port=6379
+spring.cache.type=redis
+spring.cache.redis.time-to-live=86400000   # 1 day TTL in ms
+
+
+---
+
+5.3 Custom Key Generator (Optional)
+
+@Component("customKeyGenerator")
+public class CustomKeyGenerator implements KeyGenerator {
+    @Override
+    public Object generate(Object target, Method method, Object... params) {
+        return method.getName() + ":" + Arrays.toString(params);
+    }
+}
+
+Usage:
+
+// Dynamic keys
+@Cacheable(value = "UserCache", keyGenerator = "customKeyGenerator")
+public User getUserById(Long id) { ... }
+
+// Static key
+@Cacheable(value = "ConfigCache", key = "'Static:Config'")
+public Config getAppConfig() { ... }
+
+
+---
+
+5.4 Redisson Lock Example
+
+@Autowired
+private RedissonClient redissonClient;
+
+public void updateUser(Long id) {
+    RLock lock = redissonClient.getLock("userLock:" + id);
+    try {
+        if (lock.tryLock(5, 10, TimeUnit.SECONDS)) {
+            User user = userRepository.findById(id).orElseThrow();
+            user.setLastUpdated(LocalDateTime.now());
+            userRepository.save(user);
+        }
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+    } finally {
+        if (lock.isHeldByCurrentThread()) {
+            lock.unlock();
+        }
+    }
+}
+
+
+---
+
+6. Redis Key Structure
+
+6.1 Key Format
+
+<Entity>:<Identifier>[:<SubIdentifier>]
+
+6.2 Example Keys
+
+User:123 → User record
+
+Order:987:Items → Items of an order
+
+API:GetUser:123:Profile → API response
+
+Static:Config → Global configuration
+
+
+
+---
+
+6.3 ER-style Diagram
+
+erDiagram
+    USER {
+        string User:123
+        object User JSON object
+        ttl 1 Day
+    }
+
+    ORDER {
+        string Order:987
+        object Order JSON object
+        ttl 1 Day
+    }
+
+    ORDER_ITEMS {
+        string Order:987:Items
+        list Items JSON
+        ttl 1 Day
+    }
+
+    API_CACHE {
+        string API:GetUser:123:Profile
+        json API response
+        ttl 1 Day
+    }
+
+    STATIC_CACHE {
+        string Static:Config
+        object Static configuration
+        ttl 1 Day
+    }
+
+
+---
+
+7. Sample Redis Data (CLI Dump)
+
+127.0.0.1:6379> keys User:*
+1) "User:123"
+
+127.0.0.1:6379> get User:123
+"{\"id\":123,\"name\":\"John Doe\",\"email\":\"john@example.com\"}"
+
+127.0.0.1:6379> get API:GetUser:123:Profile
+"{\"id\":123,\"profile\":{\"age\":32,\"country\":\"India\"}}"
+
+127.0.0.1:6379> get Static:Config
+"{\"version\":\"1.0.0\",\"featureFlags\":{\"newUI\":true}}"
+
+
+---
+
+8. Static Key vs Custom Key Generator — Decision Guide
+
+Use Case	Static Key	Custom Key Generator
+
+Global/shared data (configs, flags)	✅	❌
+Non-parameterized API responses	✅	❌
+Resource-specific data (User:123)	❌	✅
+Parameterized APIs (GetUser:123:Profile)	❌	✅
+Debugging readability	❌	✅
+Cross-service safety	❌	✅
+
+
+Key takeaway:
+
+Use static keys for global/static data.
+
+Use custom keys for dynamic, parameterized, or per-resource data.
+
+
+
+---
+
+9. Best Practices
+
+Keep TTL = 1 day for all keys.
+
+Use tryLock with timeout to avoid deadlocks.
+
+Always release lock in finally block.
+
+Follow naming convention Entity:Id[:SubId] or API:Method:Params.
+
+Monitor Redis memory usage, hit/miss ratio, and lock failures.
+
+
+
+---
+
+10. Benefits
+
+Faster API response times.
+
+Reduced database load.
+
+Safe concurrent access with distributed locking.
+
+Clear, maintainable cache key structure.
+
+
+
+---
+
+11. Risks & Mitigation
+
+Risk	Mitigation
+
+Redis downtime	Fallback to DB
+Stale cache	TTL + eviction policies
+Lock misconfiguration	Proper timeout settings
+Key collisions	Standard naming convention
+
+
+
+---
+
+12. Future Enhancements
+
+Multi-region Redis setup (for DR).
+
+Advanced caching strategies (write-through, refresh-ahead).
+
+Key invalidation service for fine-grained control.
+
+
+
+---
+
+✅ This is a complete end-to-end documentation:
+
+Flows & diagrams (cache, lock, combined).
+
+Key structure & examples.
+
+Sample Redis dump.
+
+Static vs custom key decision guide.
+
+Risks, benefits, best practices.
+
+
+
+---
+
+Would you like me to also create a concise 1-page executive summary version of this doc for your manager (just business benefits, risks, and high-level flow) so they don’t need to read all 12 sections?
+
+####₹₹₹#₹#₹#₹#₹#₹₹#₹
+Got it ✅ — here’s how you can place the new sections (Redis dump + Static vs Custom Key Decision Guide) into your document so it flows logically and looks polished when you share it with your manager/architect.
+
+
+---
+
+📑 Recommended Document Structure (with placement)
+
+1. Introduction & Purpose
+
+Why Redis caching?
+
+Why Redisson for distributed locks?
+
+Objectives of the design
+
+
+
+2. Architecture Overview
+
+High-level flow diagram
+
+Explanation of how cache interacts with APIs, DB, and distributed locks
+
+
+
+3. Configuration & Setup
+
+Redisson setup (YAML/Properties)
+
+TTL strategy (1 Day default)
+
+Optional static key support
+
+
+
+4. Redis Key Structure & Naming Convention
+
+Key format rules (Entity:Id[:SubId], API:Method:Params, Static:Config)
+
+ER-style Mermaid diagram of Redis keys
+
+TTL rules explained
+
+
+
+5. Sample Redis Data (CLI Dump)  ✅ (new section here)
+
+Mock examples of SET, GET, KEYS * outputs
+
+Sample JSON stored in cache
+
+Helps managers/architects visualize real cache data
+
+
+
+6. Static Key vs Custom Key Generator — Decision Guide  ✅ (place this right after sample dump)
+
+Comparison table
+
+Key takeaways
+
+When to use which approach
+
+
+
+7. Usage Guidelines & Best Practices
+
+Always use naming conventions
+
+Monitor cache hit/miss ratio
+
+Avoid cache stampede with Redisson locks
+
+Logging & debugging tips
+
+
+
+8. Future Enhancements (Optional)
+
+Cache warming / preloading
+
+Fine-grained TTL per entity
+
+Metrics integration (Prometheus/Grafana)
+
+
+
+9. Appendix
+
+References (Spring Boot docs, Redisson docs)
+
+Glossary (TTL, key eviction, lock)
+
+
+
+
+
+---
+
+👉 So, the right placement is:
+
+Sample Redis Dump → goes after Redis Key Structure section (4), since it shows the real-world representation of that structure.
+
+Static vs Custom Key Decision Guide → goes right after Redis Dump (5), so the reader understands when to apply each style of key with examples fresh in mind.
+
+
+
+---
+
+⚡ This way, your document first builds understanding (keys + diagrams), then gives evidence (sample dump), and finally gives rules (decision guide).
+
+
+---
+
+Would you like me to now merge everything into one polished document (with TOC, flow diagrams, dumps, decision guide, and future enhancements) so you can directly hand it over?
+
+
+####################№#########
+Perfect ✅ — here’s your complete polished document draft. You can copy-paste this into Confluence, Word, or Markdown (works in all). It’s structured for architects, managers, and developers alike.
+
+
+---
+
+📘 Redis Caching with Redisson in Spring Boot
+
+1. Introduction & Purpose
+
+This document describes how Redis caching is implemented in our Spring Boot application using Redisson for distributed locking and a custom key generator for dynamic API caching.
+
+Objectives
+
+Improve performance by reducing DB/API calls.
+
+Ensure data consistency across distributed nodes using Redisson locks.
+
+Provide a clear TTL strategy (default: 1 day).
+
+Support both Static Keys and Custom Key Generator for flexibility.
+
+
+
+---
+
+2. Architecture Overview
+
+High-Level Flow
+
+flowchart TD
+    A[Client Request] --> B[Spring Boot API Layer]
+    B -->|Check Cache| C[Redis Cache]
+    C -->|Hit| D[Return Cached Response]
+    C -->|Miss| E[DB/API Call]
+    E --> F[Response Data]
+    F --> G[Redisson Lock + Cache Store (TTL=1 Day)]
+    G --> D
+
+Key Components
+
+Spring Boot: API layer.
+
+Redis (via Redisson): Cache + distributed lock.
+
+DB/External API: Fallback source on cache miss.
+
+
+
+---
+
+3. Configuration & Setup
+
+Example application.yml
+
+spring:
+  cache:
+    type: redis
+  redis:
+    host: localhost
+    port: 6379
+
+redisson:
+  config: classpath:redisson.yaml
+
+TTL Strategy
+
+Default TTL: 1 day for all cached keys.
+
+Auto-expiry prevents stale data.
+
+
+Key Options
+
+Static Key → Single key for global/static data.
+
+Custom Key Generator → Auto-generates keys based on API method & parameters.
+
+
+
+---
+
+4. Redis Key Structure & Naming Convention
+
+🔑 Key Format
+
+<Entity>:<Identifier>[:<SubIdentifier>]
+
+Examples
+
+User:123 → User with ID 123.
+
+Order:987:Items → Items of order 987.
+
+API:GetUser:123:Profile → API response for GetUser call.
+
+Static:Config → Global config data.
+
+
+
+---
+
+4.1 Redis Key Structure Diagram
+
+erDiagram
+    USER {
+        string User:123
+        object User JSON object
+        ttl 1 Day
+    }
+
+    ORDER {
+        string Order:987
+        object Order JSON object
+        ttl 1 Day
+    }
+
+    ORDER_ITEMS {
+        string Order:987:Items
+        list Items of order 987
+        ttl 1 Day
+    }
+
+    API_CACHE {
+        string API:GetUser:123:Profile
+        json API response payload
+        ttl 1 Day
+    }
+
+    STATIC_CACHE {
+        string Static:Config
+        object Static configuration data
+        ttl 1 Day
+    }
+
+    USER ||--|| ORDER : "User places Orders"
+    ORDER ||--o{ ORDER_ITEMS : "Order contains Items"
+    API_CACHE ||--|| USER : "API maps to User resource"
+    STATIC_CACHE {
+        note: "Global or static data"
+    }
+
+
+---
+
+5. Sample Redis Data (CLI Dump)
+
+Redis Commands
+
+> SET User:123 '{"id":123,"name":"John Doe","email":"john@example.com"}' EX 86400
+OK
+
+> SET Order:987:Items '[{"itemId":1,"name":"Laptop"},{"itemId":2,"name":"Mouse"}]' EX 86400
+OK
+
+> SET API:GetUser:123:Profile '{"id":123,"profile":"detailed"}' EX 86400
+OK
+
+> SET Static:Config '{"featureX":true,"timeout":30}' EX 86400
+OK
+
+> KEYS *
+1) "User:123"
+2) "Order:987:Items"
+3) "API:GetUser:123:Profile"
+4) "Static:Config"
+
+> GET User:123
+{"id":123,"name":"John Doe","email":"john@example.com"}
+
+
+---
+
+6. Static Key vs Custom Key Generator — Decision Guide
+
+Use Case	Static Key	Custom Key Generator
+
+Global/shared data (app config, lookup tables)	✅ Best choice	❌ Not needed
+API responses with no parameters (e.g., /api/version)	✅ Simple	❌ Overkill
+Data scoped to IDs (User:123, Order:987)	❌ Risk of overwrite	✅ Unique keys per resource
+Parameterized APIs (/api/getUser?id=123&type=profile)	❌ Cannot differentiate	✅ Keys per method+params
+Debugging	❌ Harder	✅ Readable
+Performance-sensitive, no granularity needed	✅ Fast	⚠️ Possible cache pollution
+Multi-service consistency	❌ Collisions possible	✅ Safe & namespaced
+
+
+📌 Key Takeaways
+
+Static Key → Use for global, rarely changing, non-parameterized data.
+
+Custom Key Generator → Use for API calls with parameters, resource data, multi-tenant use cases.
+
+Both respect the 1-day TTL.
+
+
+
+---
+
+7. Usage Guidelines & Best Practices
+
+1. Always follow naming conventions.
+
+
+2. Use Redisson locks to prevent cache stampede.
+
+
+3. Monitor cache hit/miss ratio.
+
+
+4. Prefer custom keys for APIs with params.
+
+
+5. Use logging (Cacheable, CacheEvict) for debugging.
+
+
+
+
+---
+
+8. Future Enhancements
+
+Cache warming (preload frequently used keys).
+
+Fine-grained TTLs (per entity type).
+
+Metrics integration (Prometheus/Grafana).
+
+Error handling & fallback strategy.
+
+
+
+---
+
+9. Appendix
+
+References
+
+Spring Boot Cache Documentation
+
+Redisson Documentation
+
+
+Glossary
+
+TTL → Time To Live (expiry).
+
+Cache Stampede → Multiple requests hitting DB on cache miss.
+
+Key Generator → Logic to build unique cache keys dynamically.
+
+
+
+---
+
+✅ With this document:
+
+Managers understand purpose, TTL, and benefits.
+
+Architects see design, naming, and decision logic.
+
+Developers get configuration, examples, and best practices.
+
+
+
+---
+
+Would you like me to also add code snippets (e.g., @Cacheable with static vs custom key generator) so your dev team has ready-to-use examples inside this doc?
+
+
+
